@@ -133,7 +133,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   const run = useCallback(
     async (brief: VideoBrief) => {
-      console.log("DBG run start");
       const minutes = briefMinutes(brief);
       setError(null);
       setRunning(true);
@@ -147,9 +146,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
         current = "scenar";
         beginStep("scenar");
-        console.log("DBG calling script fn");
         const { script } = (await callScript({ data: { brief, minutes } })) as { script: string };
-        console.log("DBG script len", script.length);
         finishStep("scenar");
 
         current = "sceny";
@@ -185,6 +182,31 @@ export function StudioProvider({ children }: { children: ReactNode }) {
           return merged;
         });
         setLastProjectId(project.id);
+
+        // Zbývající kroky pipeline zatím simulujeme (API se doplní později).
+        for (const id of ["vizualy", "dabing", "sync", "hudba", "titulky", "render", "export"]) {
+          current = id;
+          beginStep(id);
+          await new Promise((r) => setTimeout(r, 500));
+          finishStep(id);
+        }
+        setSteps((cur) => {
+          const snapshot = cur.map((st) => ({ ...st }));
+          setProjects((list) => {
+            const next = list.map((p) =>
+              p.id === project.id
+                ? { ...p, steps: snapshot, state: "Připraveno k exportu" as const }
+                : p,
+            );
+            try {
+              localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+            } catch {
+              /* ignore */
+            }
+            return next;
+          });
+          return cur;
+        });
       } catch (err) {
         failStep(current);
         setError(errorMessage(err));
@@ -198,7 +220,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   const startWorkflow = useCallback(
     (brief: VideoBrief) => {
-      console.log("DBG startWorkflow", brief.topic);
       setActiveBrief(brief);
       setLastProjectId(null);
       void run(brief);
@@ -240,7 +261,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       if (!project) return "Projekt nenalezen.";
       const minutes = briefMinutes(project.brief);
       try {
-        console.log("DBG calling script fn");
         const { script } = (await callScript({ data: { brief: project.brief, minutes } })) as {
           script: string;
         };
