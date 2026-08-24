@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as ProjektyRouteImport } from './routes/projekty'
+import { Route as SablonyRouteImport } from './routes/sablony'
 import { Route as ProjektIdRouteImport } from './routes/projekt.$id'
 
 const IndexRoute = IndexRouteImport.update({
@@ -29,6 +30,11 @@ const ProjektyRoute = ProjektyRouteImport.update({
   path: '/projekty',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SablonyRoute = SablonyRouteImport.update({
+  id: '/sablony',
+  path: '/sablony',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProjektIdRoute = ProjektIdRouteImport.update({
   id: '/projekt/$id',
   path: '/projekt/$id',
@@ -39,12 +45,14 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/projekty': typeof ProjektyRoute
+  '/sablony': typeof SablonyRoute
   '/projekt/$id': typeof ProjektIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/projekty': typeof ProjektyRoute
+  '/sablony': typeof SablonyRoute
   '/projekt/$id': typeof ProjektIdRoute
 }
 export interface FileRoutesById {
@@ -52,20 +60,23 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/projekty': typeof ProjektyRoute
+  '/sablony': typeof SablonyRoute
   '/projekt/$id': typeof ProjektIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/dashboard' | '/projekty' | '/projekt/$id'
+  fullPaths: '/' | '/dashboard' | '/projekty' | '/sablony' | '/projekt/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/dashboard' | '/projekty' | '/projekt/$id'
-  id: '__root__' | '/' | '/dashboard' | '/projekty' | '/projekt/$id'
+  to: '/' | '/dashboard' | '/projekty' | '/sablony' | '/projekt/$id'
+  id:
+    '__root__' | '/' | '/dashboard' | '/projekty' | '/sablony' | '/projekt/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DashboardRoute: typeof DashboardRoute
   ProjektyRoute: typeof ProjektyRoute
+  SablonyRoute: typeof SablonyRoute
   ProjektIdRoute: typeof ProjektIdRoute
 }
 
@@ -92,6 +103,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProjektyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/sablony': {
+      id: '/sablony'
+      path: '/sablony'
+      fullPath: '/sablony'
+      preLoaderRoute: typeof SablonyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/projekt/$id': {
       id: '/projekt/$id'
       path: '/projekt/$id'
@@ -106,6 +124,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DashboardRoute: DashboardRoute,
   ProjektyRoute: ProjektyRoute,
+  SablonyRoute: SablonyRoute,
   ProjektIdRoute: ProjektIdRoute,
 }
 export const routeTree = rootRouteImport
