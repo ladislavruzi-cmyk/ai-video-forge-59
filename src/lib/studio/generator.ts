@@ -43,7 +43,7 @@ function narration(topic: string, title: string, i: number): string {
     `Přesto zůstávají otázky, na které nikdo neodpověděl. A možná právě to je nejsilnější část příběhu.`,
     `Pokud vás téma zaujalo, dejte odběr a napište do komentářů, čemu věříte vy.`,
   ];
-  return lines[i % lines.length].replace("{title}", title);
+  return (lines[i % lines.length] ?? lines[0]!).replace("{title}", title);
 }
 
 export function buildSteps(): WorkflowStep[] {
@@ -58,7 +58,7 @@ export function buildProject(brief: VideoBrief): VideoProject {
   const topic = brief.topic.trim() || "Nové téma";
 
   const scenes: Scene[] = Array.from({ length: sceneCount }, (_, i) => {
-    const tpl = SCENE_TEMPLATES[i % SCENE_TEMPLATES.length];
+    const tpl = SCENE_TEMPLATES[i % SCENE_TEMPLATES.length]!;
     return {
       id: `scene-${i + 1}`,
       index: i + 1,
