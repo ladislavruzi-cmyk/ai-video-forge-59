@@ -133,6 +133,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   const run = useCallback(
     async (brief: VideoBrief) => {
+      console.log("DBG run start");
       const minutes = briefMinutes(brief);
       setError(null);
       setRunning(true);
@@ -146,7 +147,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
         current = "scenar";
         beginStep("scenar");
+        console.log("DBG calling script fn");
         const { script } = (await callScript({ data: { brief, minutes } })) as { script: string };
+        console.log("DBG script len", script.length);
         finishStep("scenar");
 
         current = "sceny";
@@ -195,6 +198,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   const startWorkflow = useCallback(
     (brief: VideoBrief) => {
+      console.log("DBG startWorkflow", brief.topic);
       setActiveBrief(brief);
       setLastProjectId(null);
       void run(brief);
@@ -236,6 +240,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       if (!project) return "Projekt nenalezen.";
       const minutes = briefMinutes(project.brief);
       try {
+        console.log("DBG calling script fn");
         const { script } = (await callScript({ data: { brief: project.brief, minutes } })) as {
           script: string;
         };
