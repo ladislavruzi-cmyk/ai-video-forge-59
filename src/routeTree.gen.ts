@@ -10,12 +10,18 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as ProjektyRouteImport } from './routes/projekty'
 import { Route as ProjektIdRouteImport } from './routes/projekt.$id'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DashboardRoute = DashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProjektyRoute = ProjektyRouteImport.update({
@@ -31,30 +37,34 @@ const ProjektIdRoute = ProjektIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/dashboard': typeof DashboardRoute
   '/projekty': typeof ProjektyRoute
   '/projekt/$id': typeof ProjektIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/dashboard': typeof DashboardRoute
   '/projekty': typeof ProjektyRoute
   '/projekt/$id': typeof ProjektIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/dashboard': typeof DashboardRoute
   '/projekty': typeof ProjektyRoute
   '/projekt/$id': typeof ProjektIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/projekty' | '/projekt/$id'
+  fullPaths: '/' | '/dashboard' | '/projekty' | '/projekt/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/projekty' | '/projekt/$id'
-  id: '__root__' | '/' | '/projekty' | '/projekt/$id'
+  to: '/' | '/dashboard' | '/projekty' | '/projekt/$id'
+  id: '__root__' | '/' | '/dashboard' | '/projekty' | '/projekt/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  DashboardRoute: typeof DashboardRoute
   ProjektyRoute: typeof ProjektyRoute
   ProjektIdRoute: typeof ProjektIdRoute
 }
@@ -66,6 +76,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dashboard': {
+      id: '/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/projekty': {
@@ -87,6 +104,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  DashboardRoute: DashboardRoute,
   ProjektyRoute: ProjektyRoute,
   ProjektIdRoute: ProjektIdRoute,
 }
