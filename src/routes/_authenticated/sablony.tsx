@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { LayoutTemplate } from "lucide-react";
 import { AppShell } from "@/components/studio/AppShell";
 
-export const Route = createFileRoute("/sablony")({
+export const Route = createFileRoute("/_authenticated/sablony")({
   head: () => ({
     meta: [
       { title: "Šablony videí — AI YouTube Studio" },

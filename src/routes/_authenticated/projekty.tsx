@@ -4,7 +4,7 @@ import { AppShell } from "@/components/studio/AppShell";
 import { useStudio } from "@/lib/studio/store";
 import { formatDuration } from "@/lib/studio/types";
 
-export const Route = createFileRoute("/projekty")({
+export const Route = createFileRoute("/_authenticated/projekty")({
   head: () => ({
     meta: [
       { title: "Moje projekty — AI YouTube Studio" },

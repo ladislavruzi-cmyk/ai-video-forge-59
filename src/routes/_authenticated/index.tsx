@@ -13,7 +13,7 @@ import {
   type VideoBrief,
 } from "@/lib/studio/types";
 
-export const Route = createFileRoute("/")({
+export const Route = createFileRoute("/_authenticated/")({
   head: () => ({
     meta: [
       { title: "AI YouTube Studio — vytvoř video z jednoho tématu" },

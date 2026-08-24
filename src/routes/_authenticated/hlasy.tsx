@@ -4,7 +4,7 @@ import { Mic, Play } from "lucide-react";
 import { AppShell } from "@/components/studio/AppShell";
 import { VOICE_OPTIONS } from "@/lib/studio/types";
 
-export const Route = createFileRoute("/hlasy")({
+export const Route = createFileRoute("/_authenticated/hlasy")({
   head: () => ({
     meta: [
       { title: "Hlasy pro dabing — AI YouTube Studio" },

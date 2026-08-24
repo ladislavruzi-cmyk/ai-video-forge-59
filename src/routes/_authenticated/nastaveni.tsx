@@ -5,7 +5,7 @@ import { Check, KeyRound, X } from "lucide-react";
 import { AppShell } from "@/components/studio/AppShell";
 import { getIntegrationStatus } from "@/lib/ai/pipeline.functions";
 
-export const Route = createFileRoute("/nastaveni")({
+export const Route = createFileRoute("/_authenticated/nastaveni")({
   head: () => ({
     meta: [
       { title: "Nastavení integrací — AI YouTube Studio" },
