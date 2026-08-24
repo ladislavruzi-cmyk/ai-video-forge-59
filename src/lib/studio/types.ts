@@ -26,6 +26,8 @@ export interface WorkflowStep {
   description: string;
   status: StepStatus;
   progress: number;
+  /** Krok zatím není napojený na AI API. */
+  pending?: boolean;
 }
 
 export interface Scene {
@@ -35,6 +37,8 @@ export interface Scene {
   narration: string;
   visualPrompt: string;
   seconds: number;
+  mood: string;
+  transition: string;
   status: StepStatus;
 }
 
@@ -52,6 +56,7 @@ export interface VideoProject {
   createdAt: string;
   state: "Rozpracováno" | "Připraveno k exportu" | "Exportováno";
   totalSeconds: number;
+  wordCount: number;
   scenes: Scene[];
   script: string;
   tracks: SoundTrack[];
@@ -103,17 +108,17 @@ export const MUSIC_OPTIONS = [
   "Motivující",
 ];
 
-export const WORKFLOW_BLUEPRINT: { id: string; title: string; description: string }[] = [
+export const WORKFLOW_BLUEPRINT: { id: string; title: string; description: string; pending?: boolean }[] = [
   { id: "analyza", title: "Analýza tématu", description: "Rozbor tématu, cílové skupiny a klíčových bodů" },
-  { id: "scenar", title: "Vytvoření scénáře", description: "Generování kompletního komentáře" },
-  { id: "sceny", title: "Rozdělení scén", description: "Rozpad scénáře na jednotlivé scény" },
-  { id: "vizualy", title: "Vytvoření vizuálů", description: "AI obrazový materiál pro každou scénu" },
-  { id: "dabing", title: "Generování dabingu", description: "Text-to-speech ve vybraném hlasu" },
-  { id: "sync", title: "Synchronizace obrazu a zvuku", description: "Časování scén na stopu dabingu" },
-  { id: "hudba", title: "Přidání hudby a efektů", description: "Podkres, přechody a zvukové efekty" },
-  { id: "titulky", title: "Vytvoření titulků", description: "Titulky s přesným časováním" },
-  { id: "render", title: "Renderování videa", description: "Sestavení výsledné videostopy" },
-  { id: "export", title: "Export pro YouTube", description: "Finální kódování a metadata" },
+  { id: "scenar", title: "Vytvoření scénáře", description: "AI generuje kompletní komentář" },
+  { id: "sceny", title: "Rozdělení scén", description: "AI rozpad scénáře na strukturované scény" },
+  { id: "vizualy", title: "Vytvoření vizuálů", description: "Připraveno k napojení API", pending: true },
+  { id: "dabing", title: "Generování dabingu", description: "Připraveno k napojení API", pending: true },
+  { id: "sync", title: "Synchronizace obrazu a zvuku", description: "Připraveno k napojení API", pending: true },
+  { id: "hudba", title: "Přidání hudby a efektů", description: "Připraveno k napojení API", pending: true },
+  { id: "titulky", title: "Vytvoření titulků", description: "Připraveno k napojení API", pending: true },
+  { id: "render", title: "Renderování videa", description: "Připraveno k napojení API", pending: true },
+  { id: "export", title: "Export pro YouTube", description: "Připraveno k napojení API", pending: true },
 ];
 
 export function briefMinutes(brief: VideoBrief): number {
@@ -125,4 +130,8 @@ export function formatDuration(seconds: number): string {
   const m = Math.floor(seconds / 60);
   const s = Math.round(seconds % 60);
   return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+export function countWords(text: string): number {
+  return text.trim().split(/\s+/u).filter(Boolean).length;
 }

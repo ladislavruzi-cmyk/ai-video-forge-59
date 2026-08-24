@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { AppShell } from "@/components/studio/AppShell";
 import { useStudio } from "@/lib/studio/store";
-import { STEP_STATUS_LABEL, formatDuration, type Scene } from "@/lib/studio/types";
+import { STEP_STATUS_LABEL, countWords, formatDuration, type Scene } from "@/lib/studio/types";
 import scenePreview from "@/assets/scene-preview.jpg";
 
 export const Route = createFileRoute("/projekt/$id")({
@@ -41,10 +41,14 @@ const TABS = [
 
 function ProjectPage() {
   const { id } = Route.useParams();
-  const { getProject, updateProject } = useStudio();
+  const { getProject, updateProject, regenerateScript, regenerateScene } = useStudio();
   const project = getProject(id);
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("scenar");
   const [note, setNote] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [editScript, setEditScript] = useState(false);
+  const [editScene, setEditScene] = useState<string | null>(null);
 
   if (!project) {
     return (
@@ -121,57 +125,193 @@ function ProjectPage() {
           <p className="rounded-xl border border-cyan/30 bg-cyan/10 px-4 py-3 text-xs text-cyan">{note}</p>
         )}
 
+        {err && (
+          <div className="space-y-2 rounded-xl border border-status-error/40 bg-status-error/10 px-4 py-3">
+            <p className="text-xs font-semibold text-status-error">Generování selhalo</p>
+            <p className="text-xs text-muted-foreground">{err}</p>
+            <p className="text-[11px] text-muted-foreground">
+              Původní data zůstala zachována — klikni znovu na tlačítko regenerace.
+            </p>
+          </div>
+        )}
+
         {tab === "scenar" && (
           <section className="space-y-4">
-            <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Scénář</h3>
-            <textarea
-              value={project.script}
-              onChange={(e) => updateProject(project.id, { script: e.target.value })}
-              className="field-control min-h-[320px] whitespace-pre-wrap font-mono text-[13px] leading-relaxed"
-            />
-            <p className="text-xs text-muted-foreground">
-              Jednotlivé scény lze upravovat v záložce Scény.
-            </p>
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Scénář</h3>
+              <span className="font-mono text-[11px] text-muted-foreground">
+                {project.wordCount ?? countWords(project.script)} slov •{" "}
+                {formatDuration(project.totalSeconds)}
+              </span>
+            </div>
+            <p className="text-sm font-semibold">{project.title}</p>
+
+            {editScript ? (
+              <textarea
+                value={project.script}
+                onChange={(e) =>
+                  updateProject(project.id, {
+                    script: e.target.value,
+                    wordCount: countWords(e.target.value),
+                  })
+                }
+                className="field-control min-h-[320px] whitespace-pre-wrap font-mono text-[13px] leading-relaxed"
+              />
+            ) : (
+              <div className="max-h-[420px] overflow-y-auto whitespace-pre-wrap rounded-xl border border-border bg-surface p-4 text-[13px] leading-relaxed">
+                {project.script}
+              </div>
+            )}
+
+            <div className="flex flex-wrap gap-3">
+              <button
+                onClick={() => setEditScript((v) => !v)}
+                className="rounded-xl border border-border bg-surface px-4 py-2.5 text-xs font-bold uppercase tracking-wider"
+              >
+                {editScript ? "Uložit scénář" : "Upravit scénář"}
+              </button>
+              <button
+                disabled={busy !== null}
+                onClick={async () => {
+                  setNote(null);
+                  setErr(null);
+                  setBusy("script");
+                  const message = await regenerateScript(project.id);
+                  setBusy(null);
+                  if (message) setErr(message);
+                  else setNote("Scénář i scény byly znovu vygenerovány.");
+                }}
+                className="flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-brand-foreground disabled:opacity-60"
+              >
+                <RefreshCw className={`size-4 ${busy === "script" ? "animate-spin" : ""}`} />
+                {busy === "script" ? "Generuji…" : "Regenerovat scénář"}
+              </button>
+            </div>
           </section>
         )}
 
         {tab === "sceny" && (
           <section className="space-y-3">
             <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Scény</h3>
-            {project.scenes.map((scene) => (
-              <article key={scene.id} className="space-y-3 rounded-r-xl border-l-2 border-brand bg-surface p-4">
-                <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                  <span>
-                    Scéna {scene.index} • {formatDuration(scene.seconds)}
-                  </span>
-                  <span className="text-status-done">{STEP_STATUS_LABEL[scene.status]}</span>
-                </div>
-                <input
-                  value={scene.title}
-                  onChange={(e) => patchScene(scene.id, { title: e.target.value })}
-                  className="field-control font-semibold"
-                  aria-label={`Název scény ${scene.index}`}
-                />
-                <div className="space-y-1">
-                  <span className="field-label block">Text dabingu</span>
-                  <textarea
-                    value={scene.narration}
-                    onChange={(e) => patchScene(scene.id, { narration: e.target.value })}
-                    className="field-control min-h-[92px] resize-none text-[13px] leading-relaxed"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <span className="field-label block">Popis obrazu</span>
-                  <input
-                    value={scene.visualPrompt}
-                    onChange={(e) => patchScene(scene.id, { visualPrompt: e.target.value })}
-                    className="field-control text-[13px]"
-                  />
-                </div>
-              </article>
-            ))}
+            {project.scenes.map((scene) => {
+              const open = editScene === scene.id;
+              return (
+                <article key={scene.id} className="space-y-3 rounded-r-xl border-l-2 border-brand bg-surface p-4">
+                  <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    <span>
+                      Scéna {scene.index} • {formatDuration(scene.seconds)}
+                    </span>
+                    <span className="text-status-done">{STEP_STATUS_LABEL[scene.status]}</span>
+                  </div>
+
+                  {open ? (
+                    <input
+                      value={scene.title}
+                      onChange={(e) => patchScene(scene.id, { title: e.target.value })}
+                      className="field-control font-semibold"
+                      aria-label={`Název scény ${scene.index}`}
+                    />
+                  ) : (
+                    <p className="text-sm font-semibold">{scene.title}</p>
+                  )}
+
+                  <div className="space-y-1">
+                    <span className="field-label block">Text dabingu</span>
+                    {open ? (
+                      <textarea
+                        value={scene.narration}
+                        onChange={(e) => patchScene(scene.id, { narration: e.target.value })}
+                        className="field-control min-h-[110px] text-[13px] leading-relaxed"
+                      />
+                    ) : (
+                      <p className="whitespace-pre-wrap text-[13px] leading-relaxed">{scene.narration}</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-1">
+                    <span className="field-label block">Vizuální prompt</span>
+                    {open ? (
+                      <textarea
+                        value={scene.visualPrompt}
+                        onChange={(e) => patchScene(scene.id, { visualPrompt: e.target.value })}
+                        className="field-control min-h-[90px] font-mono text-[12px]"
+                      />
+                    ) : (
+                      <p className="font-mono text-[11px] text-muted-foreground">{scene.visualPrompt}</p>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="space-y-1">
+                      <span className="field-label block">Délka (s)</span>
+                      {open ? (
+                        <input
+                          type="number"
+                          min={1}
+                          value={scene.seconds}
+                          onChange={(e) => patchScene(scene.id, { seconds: Number(e.target.value) })}
+                          className="field-control text-[13px]"
+                        />
+                      ) : (
+                        <p className="text-[13px]">{scene.seconds}</p>
+                      )}
+                    </div>
+                    <div className="space-y-1">
+                      <span className="field-label block">Nálada</span>
+                      {open ? (
+                        <input
+                          value={scene.mood}
+                          onChange={(e) => patchScene(scene.id, { mood: e.target.value })}
+                          className="field-control text-[13px]"
+                        />
+                      ) : (
+                        <p className="text-[13px]">{scene.mood}</p>
+                      )}
+                    </div>
+                    <div className="space-y-1">
+                      <span className="field-label block">Přechod</span>
+                      {open ? (
+                        <input
+                          value={scene.transition}
+                          onChange={(e) => patchScene(scene.id, { transition: e.target.value })}
+                          className="field-control text-[13px]"
+                        />
+                      ) : (
+                        <p className="text-[13px]">{scene.transition}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => setEditScene(open ? null : scene.id)}
+                      className="rounded-lg border border-border px-3 py-2 text-[10px] font-bold uppercase tracking-wider"
+                    >
+                      {open ? "Uložit scénu" : "Upravit scénu"}
+                    </button>
+                    <button
+                      disabled={busy !== null}
+                      onClick={async () => {
+                        setNote(null);
+                        setErr(null);
+                        setBusy(scene.id);
+                        const message = await regenerateScene(project.id, scene.id);
+                        setBusy(null);
+                        if (message) setErr(message);
+                        else setNote(`Scéna ${scene.index} byla regenerována.`);
+                      }}
+                      className="flex items-center gap-1.5 rounded-lg bg-cyan/15 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-cyan disabled:opacity-60"
+                    >
+                      <RefreshCw className={`size-3 ${busy === scene.id ? "animate-spin" : ""}`} />
+                      {busy === scene.id ? "Generuji…" : "Regenerovat scénu"}
+                    </button>
+                  </div>
+                </article>
+              );
+            })}
           </section>
         )}
+
 
         {tab === "dabing" && (
           <section className="space-y-4">

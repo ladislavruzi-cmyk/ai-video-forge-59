@@ -44,7 +44,7 @@ const DEFAULT_BRIEF: VideoBrief = {
 };
 
 function NewVideoPage() {
-  const { steps, running, startWorkflow, resetWorkflow, lastProjectId } = useStudio();
+  const { steps, running, error, startWorkflow, resetWorkflow, retryFailedStep, lastProjectId } = useStudio();
   const [brief, setBrief] = useState<VideoBrief>(DEFAULT_BRIEF);
   const started = running || steps.some((s) => s.progress > 0);
 
@@ -220,6 +220,21 @@ function NewVideoPage() {
         {started && (
           <>
             <WorkflowList steps={steps} />
+
+            {error && (
+              <div className="space-y-3 rounded-xl border border-status-error/40 bg-status-error/10 p-4">
+                <p className="text-sm font-semibold text-status-error">Generování selhalo</p>
+                <p className="text-xs text-muted-foreground">{error}</p>
+                <button
+                  type="button"
+                  onClick={retryFailedStep}
+                  className="rounded-lg bg-brand px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-brand-foreground"
+                >
+                  Zkusit znovu
+                </button>
+              </div>
+            )}
+
 
             <div className="flex flex-wrap gap-3">
               {lastProjectId && (
