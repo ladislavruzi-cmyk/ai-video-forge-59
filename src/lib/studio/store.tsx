@@ -8,15 +8,39 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { buildProject, buildSteps } from "./generator";
-import type { StepStatus, VideoBrief, VideoProject, WorkflowStep } from "./types";
+import { useServerFn } from "@tanstack/react-start";
+import {
+  buildSteps,
+  buildTracks,
+  normalizeScenes,
+  toRawScene,
+  type RawScene,
+} from "./generator";
+import {
+  briefMinutes,
+  countWords,
+  type Scene,
+  type VideoBrief,
+  type VideoProject,
+  type WorkflowStep,
+} from "./types";
+import { generateScenesFn, generateScriptFn, regenerateSceneFn } from "@/lib/ai/pipeline.functions";
 
 const STORAGE_KEY = "ai-yt-studio-projects";
+
+function errorMessage(err: unknown): string {
+  const raw = err instanceof Error ? err.message : String(err);
+  if (/fetch|network|Failed to fetch/i.test(raw)) {
+    return "Nepodařilo se spojit se serverem. Zkontroluj připojení a zkus to znovu.";
+  }
+  return raw || "Generování selhalo. Zkus to prosím znovu.";
+}
 
 interface StudioContextValue {
   projects: VideoProject[];
   steps: WorkflowStep[];
   running: boolean;
+  error: string | null;
   activeBrief: VideoBrief | null;
   lastProjectId: string | null;
   startWorkflow: (brief: VideoBrief) => void;
@@ -25,6 +49,8 @@ interface StudioContextValue {
   getProject: (id: string) => VideoProject | undefined;
   updateProject: (id: string, patch: Partial<VideoProject>) => void;
   deleteProject: (id: string) => void;
+  regenerateScript: (id: string) => Promise<string | null>;
+  regenerateScene: (id: string, sceneId: string) => Promise<string | null>;
 }
 
 const StudioContext = createContext<StudioContextValue | null>(null);
@@ -33,9 +59,14 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [projects, setProjects] = useState<VideoProject[]>([]);
   const [steps, setSteps] = useState<WorkflowStep[]>(() => buildSteps());
   const [running, setRunning] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [activeBrief, setActiveBrief] = useState<VideoBrief | null>(null);
   const [lastProjectId, setLastProjectId] = useState<string | null>(null);
-  const timer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const creep = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const callScript = useServerFn(generateScriptFn);
+  const callScenes = useServerFn(generateScenesFn);
+  const callScene = useServerFn(regenerateSceneFn);
 
   useEffect(() => {
     try {
@@ -55,93 +86,266 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const stop = useCallback(() => {
-    if (timer.current) clearInterval(timer.current);
-    timer.current = null;
+  const stopCreep = useCallback(() => {
+    if (creep.current) clearInterval(creep.current);
+    creep.current = null;
   }, []);
 
-  useEffect(() => stop, [stop]);
+  useEffect(() => stopCreep, [stopCreep]);
+
+  const patchStep = useCallback((id: string, patch: Partial<WorkflowStep>) => {
+    setSteps((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
+  }, []);
+
+  /** Rozjede krok a nechá progress pomalu narůstat, dokud AI pracuje. */
+  const beginStep = useCallback(
+    (id: string) => {
+      stopCreep();
+      patchStep(id, { status: "running", progress: 6 });
+      creep.current = setInterval(() => {
+        setSteps((prev) =>
+          prev.map((s) =>
+            s.id === id && s.status === "running"
+              ? { ...s, progress: Math.min(92, s.progress + Math.random() * 4 + 1) }
+              : s,
+          ),
+        );
+      }, 400);
+    },
+    [patchStep, stopCreep],
+  );
+
+  const finishStep = useCallback(
+    (id: string) => {
+      stopCreep();
+      patchStep(id, { status: "done", progress: 100 });
+    },
+    [patchStep, stopCreep],
+  );
+
+  const failStep = useCallback(
+    (id: string) => {
+      stopCreep();
+      patchStep(id, { status: "error" });
+    },
+    [patchStep, stopCreep],
+  );
 
   const run = useCallback(
-    (brief: VideoBrief) => {
-      stop();
+    async (brief: VideoBrief) => {
+      const minutes = briefMinutes(brief);
+      setError(null);
       setRunning(true);
-      let index = 0;
-      setSteps(buildSteps().map((s, i) => (i === 0 ? { ...s, status: "running" as StepStatus } : s)));
+      setSteps(buildSteps());
+      let current = "analyza";
 
-      timer.current = setInterval(() => {
-        setSteps((prev) => {
-          const next = prev.map((s) => ({ ...s }));
-          const current = next[index];
-          if (!current) return prev;
-          current.status = "running";
-          current.progress = Math.min(100, current.progress + 18 + Math.random() * 22);
-          if (current.progress >= 100) {
-            current.progress = 100;
-            current.status = "done";
-            index += 1;
-            if (index >= next.length) {
-              stop();
-              setRunning(false);
-              const project = buildProject(brief);
-              setProjects((cur) => {
-                const merged = [project, ...cur];
-                try {
-                  localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
-                } catch {
-                  /* ignore */
-                }
-                return merged;
-              });
-              setLastProjectId(project.id);
-            } else {
-              next[index]!.status = "running";
-            }
+      try {
+        beginStep("analyza");
+        await new Promise((r) => setTimeout(r, 700));
+        finishStep("analyza");
+
+        current = "scenar";
+        beginStep("scenar");
+        const { script } = (await callScript({ data: { brief, minutes } })) as { script: string };
+        finishStep("scenar");
+
+        current = "sceny";
+        beginStep("sceny");
+        const { scenes: rawScenes } = (await callScenes({
+          data: { brief, minutes, script },
+        })) as { scenes: RawScene[] };
+        finishStep("sceny");
+
+        const scenes = normalizeScenes(rawScenes, minutes * 60);
+        const project: VideoProject = {
+          id: `proj-${Date.now().toString(36)}`,
+          title: brief.topic.trim() || "Nové téma",
+          brief,
+          createdAt: new Date().toISOString(),
+          state: "Rozpracováno",
+          totalSeconds: scenes.reduce((a, s) => a + s.seconds, 0),
+          wordCount: countWords(script),
+          scenes,
+          script,
+          tracks: buildTracks(brief, scenes.length),
+          subtitlesEnabled: true,
+          steps: [],
+        };
+
+        setProjects((cur) => {
+          const merged = [project, ...cur];
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+          } catch {
+            /* ignore */
           }
-          return next;
+          return merged;
         });
-      }, 260);
+        setLastProjectId(project.id);
+
+        // Zbývající kroky pipeline zatím simulujeme (API se doplní později).
+        for (const id of ["vizualy", "dabing", "sync", "hudba", "titulky", "render", "export"]) {
+          current = id;
+          beginStep(id);
+          await new Promise((r) => setTimeout(r, 500));
+          finishStep(id);
+        }
+        setSteps((cur) => {
+          const snapshot = cur.map((st) => ({ ...st }));
+          setProjects((list) => {
+            const next = list.map((p) =>
+              p.id === project.id
+                ? { ...p, steps: snapshot, state: "Připraveno k exportu" as const }
+                : p,
+            );
+            try {
+              localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+            } catch {
+              /* ignore */
+            }
+            return next;
+          });
+          return cur;
+        });
+      } catch (err) {
+        failStep(current);
+        setError(errorMessage(err));
+      } finally {
+        stopCreep();
+        setRunning(false);
+      }
     },
-    [stop],
+    [beginStep, callScenes, callScript, failStep, finishStep, stopCreep],
   );
 
   const startWorkflow = useCallback(
     (brief: VideoBrief) => {
       setActiveBrief(brief);
       setLastProjectId(null);
-      run(brief);
+      void run(brief);
     },
     [run],
   );
 
   const resetWorkflow = useCallback(() => {
-    stop();
+    stopCreep();
     setRunning(false);
     setSteps(buildSteps());
     setLastProjectId(null);
     setActiveBrief(null);
-  }, [stop]);
+    setError(null);
+  }, [stopCreep]);
 
   const retryFailedStep = useCallback(() => {
-    if (activeBrief) run(activeBrief);
+    if (activeBrief) void run(activeBrief);
   }, [activeBrief, run]);
+
+  const updateProject = useCallback(
+    (id: string, patch: Partial<VideoProject>) => {
+      setProjects((cur) => {
+        const next = cur.map((p) => (p.id === id ? { ...p, ...patch } : p));
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+        } catch {
+          /* ignore */
+        }
+        return next;
+      });
+    },
+    [],
+  );
+
+  const regenerateScript = useCallback(
+    async (id: string): Promise<string | null> => {
+      const project = projects.find((p) => p.id === id);
+      if (!project) return "Projekt nenalezen.";
+      const minutes = briefMinutes(project.brief);
+      try {
+        const { script } = (await callScript({ data: { brief: project.brief, minutes } })) as {
+          script: string;
+        };
+        const { scenes: rawScenes } = (await callScenes({
+          data: { brief: project.brief, minutes, script },
+        })) as { scenes: RawScene[] };
+        const scenes = normalizeScenes(rawScenes, minutes * 60);
+        updateProject(id, {
+          script,
+          scenes,
+          wordCount: countWords(script),
+          totalSeconds: scenes.reduce((a, s) => a + s.seconds, 0),
+        });
+        return null;
+      } catch (err) {
+        return errorMessage(err);
+      }
+    },
+    [callScenes, callScript, projects, updateProject],
+  );
+
+  const regenerateScene = useCallback(
+    async (id: string, sceneId: string): Promise<string | null> => {
+      const project = projects.find((p) => p.id === id);
+      const target = project?.scenes.find((s) => s.id === sceneId);
+      if (!project || !target) return "Scéna nenalezena.";
+      try {
+        const { scene } = (await callScene({
+          data: {
+            brief: project.brief,
+            minutes: briefMinutes(project.brief),
+            scene: toRawScene(target),
+          },
+        })) as { scene: RawScene };
+        const next: Scene = {
+          ...target,
+          title: scene.title?.trim() || target.title,
+          narration: scene.narration?.trim() || target.narration,
+          visualPrompt: scene.visual_prompt?.trim() || target.visualPrompt,
+          seconds: scene.estimated_duration > 0 ? Math.round(scene.estimated_duration) : target.seconds,
+          mood: scene.mood?.trim() || target.mood,
+          transition: scene.transition?.trim() || target.transition,
+        };
+        const scenes = project.scenes.map((s) => (s.id === sceneId ? next : s));
+        updateProject(id, { scenes, totalSeconds: scenes.reduce((a, s) => a + s.seconds, 0) });
+        return null;
+      } catch (err) {
+        return errorMessage(err);
+      }
+    },
+    [callScene, projects, updateProject],
+  );
 
   const value = useMemo<StudioContextValue>(
     () => ({
       projects,
       steps,
       running,
+      error,
       activeBrief,
       lastProjectId,
       startWorkflow,
       resetWorkflow,
       retryFailedStep,
       getProject: (id) => projects.find((p) => p.id === id),
-      updateProject: (id, patch) =>
-        persist(projects.map((p) => (p.id === id ? { ...p, ...patch } : p))),
+      updateProject,
       deleteProject: (id) => persist(projects.filter((p) => p.id !== id)),
+      regenerateScript,
+      regenerateScene,
     }),
-    [projects, steps, running, activeBrief, lastProjectId, startWorkflow, resetWorkflow, retryFailedStep, persist],
+    [
+      projects,
+      steps,
+      running,
+      error,
+      activeBrief,
+      lastProjectId,
+      startWorkflow,
+      resetWorkflow,
+      retryFailedStep,
+      updateProject,
+      persist,
+      regenerateScript,
+      regenerateScene,
+    ],
   );
 
   return <StudioContext.Provider value={value}>{children}</StudioContext.Provider>;

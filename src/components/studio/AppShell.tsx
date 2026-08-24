@@ -58,7 +58,7 @@ export function AppShell({ title, children }: { title: string; children: ReactNo
           ))}
         </nav>
         <p className="mt-auto px-3 text-[10px] leading-relaxed text-muted-foreground">
-          Simulační režim. AI API se připojí na serverové straně.
+          Scénář a scény generuje AI. Dabing, vizuály a render se doplní později.
         </p>
       </aside>
 

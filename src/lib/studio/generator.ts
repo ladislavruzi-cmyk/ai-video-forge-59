@@ -1,76 +1,67 @@
 import {
   WORKFLOW_BLUEPRINT,
-  briefMinutes,
+  countWords,
   type Scene,
   type SoundTrack,
   type VideoBrief,
-  type VideoProject,
   type WorkflowStep,
 } from "./types";
 
-/**
- * Lokální simulace generování. Nahradí se voláním serverových funkcí
- * ve `src/lib/ai/pipeline.functions.ts`, jakmile budou připojena AI API.
- */
-
-const SCENE_TEMPLATES = [
-  { title: "Úvodní hook", visual: "Široký atmosférický záběr, pomalý nájezd kamery" },
-  { title: "Představení tématu", visual: "Archivní materiál s jemným zrnem" },
-  { title: "První záhada", visual: "Detail mapy s dramatickým osvětlením" },
-  { title: "Historický kontext", visual: "Rekonstrukce historické scény, teplé tóny" },
-  { title: "Klíčové svědectví", visual: "Dokumentární portrét, hloubka ostrosti" },
-  { title: "Vědecké vysvětlení", visual: "Datová vizualizace a schémata" },
-  { title: "Zlom v příběhu", visual: "Rychlý střih, kontrastní světlo" },
-  { title: "Nové důkazy", visual: "Makro detaily dokumentů a artefaktů" },
-  { title: "Vyvrácené teorie", visual: "Rozdělená obrazovka s porovnáním" },
-  { title: "Co víme dnes", visual: "Letecké záběry lokace, denní světlo" },
-  { title: "Otevřené otázky", visual: "Pomalý přejezd nad prázdnou krajinou" },
-  { title: "Závěr a výzva", visual: "Kamera se vzdaluje, tmavý fade" },
-];
-
-function narration(topic: string, title: string, i: number): string {
-  const lines = [
-    `Existuje téma, které dodnes rozděluje odborníky i veřejnost: ${topic}. To, co se dozvíte v následujících minutách, mění celý pohled na věc.`,
-    `Abychom pochopili, o co skutečně jde, musíme se vrátit na začátek. ${topic} má totiž historii delší, než by kdokoli čekal.`,
-    `První skutečná záhada se objevuje právě zde. Záznamy si navzájem odporují a chybí jakékoli vysvětlení.`,
-    `V dobovém kontextu působilo vše jinak. Lidé neměli technologie, kterými dnes ověřujeme fakta.`,
-    `Svědecké výpovědi jsou zásadní. Právě ony přinesly detail, který dlouho nikdo nedokázal vysvětlit.`,
-    `Věda ale nabízí střízlivější pohled. Data ukazují, že mnohé lze vysvětlit fyzikou a statistikou.`,
-    `A pak přišel moment, který všechno změnil. Jedna nová informace obrátila celý výklad naruby.`,
-    `Nové důkazy se objevily až s moderními metodami. Analýza odhalila to, co dřív zůstávalo skryté.`,
-    `Řada populárních teorií se mezitím zhroutila. Bez důkazů zůstává jen atraktivní vyprávění.`,
-    `Jak tedy dnes ${topic} chápeme? Odpověď je méně senzační, ale mnohem zajímavější.`,
-    `Přesto zůstávají otázky, na které nikdo neodpověděl. A možná právě to je nejsilnější část příběhu.`,
-    `Pokud vás téma zaujalo, dejte odběr a napište do komentářů, čemu věříte vy.`,
-  ];
-  return (lines[i % lines.length] ?? lines[0]!).replace("{title}", title);
-}
+export const WORDS_PER_MINUTE = 145;
 
 export function buildSteps(): WorkflowStep[] {
   return WORKFLOW_BLUEPRINT.map((s) => ({ ...s, status: "waiting", progress: 0 }));
 }
 
-export function buildProject(brief: VideoBrief): VideoProject {
-  const minutes = briefMinutes(brief);
-  const totalSeconds = minutes * 60;
-  const sceneCount = Math.min(SCENE_TEMPLATES.length, Math.max(4, Math.round(minutes * 1.6)));
-  const per = Math.round(totalSeconds / sceneCount);
-  const topic = brief.topic.trim() || "Nové téma";
+export interface RawScene {
+  scene_number: number;
+  title: string;
+  narration: string;
+  visual_prompt: string;
+  estimated_duration: number;
+  transition: string;
+  mood: string;
+}
 
-  const scenes: Scene[] = Array.from({ length: sceneCount }, (_, i) => {
-    const tpl = SCENE_TEMPLATES[i % SCENE_TEMPLATES.length]!;
-    return {
-      id: `scene-${i + 1}`,
-      index: i + 1,
-      title: tpl.title,
-      narration: narration(topic, tpl.title, i),
-      visualPrompt: `${brief.style.toLowerCase()} styl — ${tpl.visual}`,
-      seconds: per,
-      status: "done",
-    };
+/** Přepočítá délky scén podle množství textu a doladí je na cílovou délku videa. */
+export function normalizeScenes(raw: RawScene[], targetSeconds: number): Scene[] {
+  const base = raw.map((s, i) => {
+    const words = countWords(s.narration);
+    const fromText = Math.max(4, Math.round((words / WORDS_PER_MINUTE) * 60));
+    const seconds = s.estimated_duration > 0 ? Math.round((fromText + s.estimated_duration) / 2) : fromText;
+    return { raw: s, index: i + 1, seconds };
   });
 
-  const tracks: SoundTrack[] = [
+  const sum = base.reduce((a, b) => a + b.seconds, 0) || 1;
+  const factor = targetSeconds / sum;
+
+  return base.map(({ raw: s, index, seconds }) => ({
+    id: `scene-${index}`,
+    index,
+    title: s.title?.trim() || `Scéna ${index}`,
+    narration: s.narration?.trim() ?? "",
+    visualPrompt: s.visual_prompt?.trim() ?? "",
+    seconds: Math.max(3, Math.round(seconds * factor)),
+    mood: s.mood?.trim() || "Neutral",
+    transition: s.transition?.trim() || "Cut",
+    status: "done" as const,
+  }));
+}
+
+export function toRawScene(scene: Scene): RawScene {
+  return {
+    scene_number: scene.index,
+    title: scene.title,
+    narration: scene.narration,
+    visual_prompt: scene.visualPrompt,
+    estimated_duration: scene.seconds,
+    transition: scene.transition,
+    mood: scene.mood,
+  };
+}
+
+export function buildTracks(brief: VideoBrief, sceneCount: number): SoundTrack[] {
+  return [
     ...(brief.music === "Bez hudby"
       ? []
       : [
@@ -87,26 +78,13 @@ export function buildProject(brief: VideoBrief): VideoProject {
             note: "Fade out posledních 8 s",
           },
         ]),
-    { id: "sfx-whoosh", name: "Přechody mezi scénami (whoosh)", kind: "Efekt", note: `${scenes.length - 1}× použito` },
-    { id: "sfx-amb", name: "Ambientní ruch pozadí", kind: "Efekt", note: "Celá délka videa" },
-    { id: "sfx-impact", name: "Impact u zlomových scén", kind: "Efekt", note: "3× použito" },
+    {
+      id: "sfx-whoosh",
+      name: "Přechody mezi scénami (whoosh)",
+      kind: "Efekt" as const,
+      note: `${Math.max(0, sceneCount - 1)}× použito`,
+    },
+    { id: "sfx-amb", name: "Ambientní ruch pozadí", kind: "Efekt" as const, note: "Celá délka videa" },
+    { id: "sfx-impact", name: "Impact u zlomových scén", kind: "Efekt" as const, note: "3× použito" },
   ];
-
-  const script = scenes
-    .map((s) => `SCÉNA ${s.index} — ${s.title}\n${s.narration}`)
-    .join("\n\n");
-
-  return {
-    id: `proj-${Date.now().toString(36)}`,
-    title: topic,
-    brief,
-    createdAt: new Date().toISOString(),
-    state: "Připraveno k exportu",
-    totalSeconds,
-    scenes,
-    script,
-    tracks,
-    subtitlesEnabled: true,
-    steps: buildSteps().map((s) => ({ ...s, status: "done", progress: 100 })),
-  };
 }
