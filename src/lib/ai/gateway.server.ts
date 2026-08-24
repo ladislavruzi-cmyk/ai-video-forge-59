@@ -3,8 +3,8 @@
  * Klíč se čte pouze zde (uvnitř handlerů) a nikdy se nedostane do frontendu.
  */
 
-const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/responses";
-export const CHAT_MODEL = "openai/gpt-5.6-sol";
+const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
+export const CHAT_MODEL = "google/gemini-3-flash";
 
 export class AiError extends Error {
   status: number;
@@ -31,8 +31,8 @@ interface GatewayOptions {
 }
 
 /**
- * Streamované volání Responses API — nutné, protože generování dlouhých
- * scénářů běží desítky sekund až minuty. Text se skládá z SSE delt.
+ * Streamované volání gatewaye — nutné, protože generování dlouhých scénářů
+ * běží desítky sekund. Text se skládá z SSE delt, žádný časový limit.
  */
 export async function callGateway({ system, prompt, jsonSchema }: GatewayOptions): Promise<string> {
   const apiKey = process.env["LOVABLE_API_KEY"];
@@ -41,19 +41,15 @@ export async function callGateway({ system, prompt, jsonSchema }: GatewayOptions
   const body: Record<string, unknown> = {
     model: CHAT_MODEL,
     stream: true,
-    store: false,
-    reasoning: { effort: "low", summary: "auto" },
-    instructions: system,
-    input: [{ role: "user", content: [{ type: "input_text", text: prompt }] }],
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: prompt },
+    ],
   };
   if (jsonSchema) {
-    body["text"] = {
-      format: {
-        type: "json_schema",
-        name: jsonSchema.name,
-        strict: true,
-        schema: jsonSchema.schema,
-      },
+    body["response_format"] = {
+      type: "json_schema",
+      json_schema: { name: jsonSchema.name, strict: true, schema: jsonSchema.schema },
     };
   }
 
@@ -89,17 +85,12 @@ export async function callGateway({ system, prompt, jsonSchema }: GatewayOptions
       if (!payload || payload === "[DONE]") continue;
       try {
         const evt = JSON.parse(payload) as {
-          type?: string;
-          delta?: string;
-          response?: { output_text?: string; error?: { message?: string } };
+          choices?: { delta?: { content?: string } }[];
+          error?: { message?: string };
         };
-        if (evt.type === "response.output_text.delta" && typeof evt.delta === "string") {
-          out += evt.delta;
-        } else if (evt.type === "response.failed" || evt.type === "error") {
-          throw new AiError(evt.response?.error?.message ?? "AI generování selhalo.", 500);
-        } else if (evt.type === "response.completed" && !out && evt.response?.output_text) {
-          out = evt.response.output_text;
-        }
+        if (evt.error) throw new AiError(evt.error.message ?? "AI generování selhalo.", 500);
+        const delta = evt.choices?.[0]?.delta?.content;
+        if (typeof delta === "string") out += delta;
       } catch (err) {
         if (err instanceof AiError) throw err;
         /* ignore nekompletní / neznámé eventy */
