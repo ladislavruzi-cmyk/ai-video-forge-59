@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as HlasyRouteImport } from './routes/hlasy'
+import { Route as HudbaRouteImport } from './routes/hudba'
 import { Route as ProjektyRouteImport } from './routes/projekty'
 import { Route as SablonyRouteImport } from './routes/sablony'
 import { Route as ProjektIdRouteImport } from './routes/projekt.$id'
@@ -29,6 +30,11 @@ const DashboardRoute = DashboardRouteImport.update({
 const HlasyRoute = HlasyRouteImport.update({
   id: '/hlasy',
   path: '/hlasy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HudbaRoute = HudbaRouteImport.update({
+  id: '/hudba',
+  path: '/hudba',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProjektyRoute = ProjektyRouteImport.update({
@@ -51,6 +57,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/hlasy': typeof HlasyRoute
+  '/hudba': typeof HudbaRoute
   '/projekty': typeof ProjektyRoute
   '/sablony': typeof SablonyRoute
   '/projekt/$id': typeof ProjektIdRoute
@@ -59,6 +66,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/hlasy': typeof HlasyRoute
+  '/hudba': typeof HudbaRoute
   '/projekty': typeof ProjektyRoute
   '/sablony': typeof SablonyRoute
   '/projekt/$id': typeof ProjektIdRoute
@@ -68,6 +76,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/hlasy': typeof HlasyRoute
+  '/hudba': typeof HudbaRoute
   '/projekty': typeof ProjektyRoute
   '/sablony': typeof SablonyRoute
   '/projekt/$id': typeof ProjektIdRoute
@@ -75,14 +84,28 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/dashboard' | '/hlasy' | '/projekty' | '/sablony' | '/projekt/$id'
+    | '/'
+    | '/dashboard'
+    | '/hlasy'
+    | '/hudba'
+    | '/projekty'
+    | '/sablony'
+    | '/projekt/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/dashboard' | '/hlasy' | '/projekty' | '/sablony' | '/projekt/$id'
+  to:
+    | '/'
+    | '/dashboard'
+    | '/hlasy'
+    | '/hudba'
+    | '/projekty'
+    | '/sablony'
+    | '/projekt/$id'
   id:
     | '__root__'
     | '/'
     | '/dashboard'
     | '/hlasy'
+    | '/hudba'
     | '/projekty'
     | '/sablony'
     | '/projekt/$id'
@@ -92,6 +115,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DashboardRoute: typeof DashboardRoute
   HlasyRoute: typeof HlasyRoute
+  HudbaRoute: typeof HudbaRoute
   ProjektyRoute: typeof ProjektyRoute
   SablonyRoute: typeof SablonyRoute
   ProjektIdRoute: typeof ProjektIdRoute
@@ -118,6 +142,13 @@ declare module '@tanstack/react-router' {
       path: '/hlasy'
       fullPath: '/hlasy'
       preLoaderRoute: typeof HlasyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/hudba': {
+      id: '/hudba'
+      path: '/hudba'
+      fullPath: '/hudba'
+      preLoaderRoute: typeof HudbaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/projekty': {
@@ -148,6 +179,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DashboardRoute: DashboardRoute,
   HlasyRoute: HlasyRoute,
+  HudbaRoute: HudbaRoute,
   ProjektyRoute: ProjektyRoute,
   SablonyRoute: SablonyRoute,
   ProjektIdRoute: ProjektIdRoute,
