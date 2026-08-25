@@ -239,13 +239,14 @@ export function RenderPanel({
             Přehrát video
           </a>
           <a
-            href={job.videoUrl}
+            href={job.downloadUrl ?? job.videoUrl}
             download={`${project.title || "video"}.mp4`}
             className="flex items-center justify-center gap-2 rounded-xl border border-border bg-surface py-3.5 text-sm font-medium"
           >
             <Download className="size-4" />
             Stáhnout video
           </a>
+
         </div>
       )}
     </section>
