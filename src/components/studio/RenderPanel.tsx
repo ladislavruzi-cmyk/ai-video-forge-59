@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { AlertTriangle, Check, Download, Loader2, Play, RefreshCw, Upload } from "lucide-react";
-import { latestRenderFn, renderStatusFn, startRenderFn, type RenderJobView } from "@/lib/ai/render.functions";
+import { latestRenderFn, refreshRenderUrlFn, renderStatusFn, startRenderFn, type RenderJobView } from "@/lib/ai/render.functions";
 import { formatSeconds } from "@/lib/studio/timeline";
 import type { VideoProject } from "@/lib/studio/types";
 
