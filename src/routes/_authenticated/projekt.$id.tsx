@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { AppShell } from "@/components/studio/AppShell";
 import { SceneImage } from "@/components/studio/SceneImage";
+import { SceneAudio } from "@/components/studio/SceneAudio";
 import { useStudio } from "@/lib/studio/store";
 import {
   STEP_STATUS_LABEL,
@@ -50,7 +51,8 @@ const TABS = [
 
 function ProjectPage() {
   const { id } = Route.useParams();
-  const { getProject, updateProject, regenerateScript, regenerateScene, generateVisual } = useStudio();
+  const { getProject, updateProject, regenerateScript, regenerateScene, generateVisual, generateVoice } =
+    useStudio();
   const project = getProject(id);
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("scenar");
   const [note, setNote] = useState<string | null>(null);
@@ -332,24 +334,97 @@ function ProjectPage() {
 
         {tab === "dabing" && (
           <section className="space-y-4">
-            <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Dabing</h3>
-            <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-border bg-surface p-5">
-              <div>
-                <p className="text-sm font-semibold">{project.brief.voice}</p>
-                <p className="text-xs text-muted-foreground">
-                  Jazyk: {project.brief.language} • stopa {formatDuration(project.totalSeconds)}
-                </p>
-              </div>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Dabing</h3>
               <button
-                onClick={() => setNote("Ukázka hlasu se přehraje po připojení text-to-speech API.")}
-                className="flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-brand-foreground"
+                disabled={busy !== null}
+                onClick={async () => {
+                  setNote(null);
+                  setErr(null);
+                  let failed = 0;
+                  for (const scene of project.scenes) {
+                    setBusy(`aud-${scene.id}`);
+                    const message = await generateVoice(project.id, scene.id);
+                    if (message) failed += 1;
+                  }
+                  setBusy(null);
+                  if (failed > 0) setErr(`${failed} scén(y) se nepodařilo namluvit. Zkus je znovu jednotlivě.`);
+                  else setNote("Dabing všech scén byl vygenerován.");
+                }}
+                className="flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-brand-foreground disabled:opacity-60"
               >
                 <Play className="size-4" />
-                Přehrát ukázku
+                Vygenerovat všechen dabing
               </button>
+            </div>
+
+            <div className="rounded-2xl border border-border bg-surface p-5">
+              <p className="text-sm font-semibold">{project.brief.voice}</p>
+              <p className="text-xs text-muted-foreground">
+                Jazyk: {project.brief.language} • cílová stopa {formatDuration(project.totalSeconds)}
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              {project.scenes.map((scene) => {
+                const status = scene.audioStatus ?? "waiting";
+                const generating = busy === `aud-${scene.id}` || status === "running";
+                return (
+                  <article key={scene.id} className="space-y-3 rounded-2xl border border-border bg-surface p-4">
+                    <div className="flex items-center justify-between gap-2 text-[10px] font-bold uppercase tracking-wider">
+                      <span className="text-muted-foreground">Scéna {scene.index}</span>
+                      <span
+                        className={
+                          status === "done"
+                            ? "text-status-done"
+                            : status === "error"
+                              ? "text-status-error"
+                              : status === "running"
+                                ? "text-cyan"
+                                : "text-muted-foreground"
+                        }
+                      >
+                        {VISUAL_STATUS_LABEL[generating ? "running" : status]}
+                      </span>
+                    </div>
+                    <p className="text-xs font-semibold">{scene.title}</p>
+                    <p className="line-clamp-2 text-[11px] text-muted-foreground">{scene.narration}</p>
+                    {scene.audioSeconds ? (
+                      <p className="text-[11px] text-muted-foreground">
+                        Délka audia: {formatDuration(scene.audioSeconds)}
+                      </p>
+                    ) : null}
+                    {status === "done" && scene.audioPath && (
+                      <SceneAudio path={scene.audioPath} label={`Dabing scény ${scene.index}`} />
+                    )}
+                    {scene.audioError && <p className="text-[11px] text-status-error">{scene.audioError}</p>}
+                    <button
+                      disabled={busy !== null}
+                      onClick={async () => {
+                        setNote(null);
+                        setErr(null);
+                        setBusy(`aud-${scene.id}`);
+                        const message = await generateVoice(project.id, scene.id);
+                        setBusy(null);
+                        if (message) setErr(message);
+                        else setNote(`Dabing scény ${scene.index} je hotový.`);
+                      }}
+                      className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-cyan disabled:opacity-60"
+                    >
+                      <RefreshCw className={`size-3 ${generating ? "animate-spin" : ""}`} />
+                      {generating
+                        ? "Generuji…"
+                        : scene.audioPath
+                          ? "Regenerovat dabing"
+                          : "Vygenerovat dabing"}
+                    </button>
+                  </article>
+                );
+              })}
             </div>
           </section>
         )}
+
 
         {tab === "vizualy" && (
           <section className="space-y-4">

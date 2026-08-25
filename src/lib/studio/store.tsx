@@ -26,6 +26,7 @@ import {
 } from "./types";
 import { generateScenesFn, generateScriptFn, regenerateSceneFn } from "@/lib/ai/pipeline.functions";
 import { generateSceneVisualFn } from "@/lib/ai/visuals.functions";
+import { generateSceneVoiceFn } from "@/lib/ai/voice.functions";
 import { fetchProjects, removeProject, saveProject } from "./projects.repo";
 
 
@@ -53,6 +54,7 @@ interface StudioContextValue {
   regenerateScript: (id: string) => Promise<string | null>;
   regenerateScene: (id: string, sceneId: string) => Promise<string | null>;
   generateVisual: (id: string, sceneId: string) => Promise<string | null>;
+  generateVoice: (id: string, sceneId: string) => Promise<string | null>;
 }
 
 
@@ -73,6 +75,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const callScenes = useServerFn(generateScenesFn);
   const callScene = useServerFn(regenerateSceneFn);
   const callVisual = useServerFn(generateSceneVisualFn);
+  const callVoice = useServerFn(generateSceneVoiceFn);
 
 
   useEffect(() => {
@@ -271,6 +274,43 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     [callVisual, patchScene, projects],
   );
 
+  /** Vygeneruje dabing jedné scény. Chyba jedné scény neovlivní ostatní. */
+  const generateVoice = useCallback(
+    async (id: string, sceneId: string): Promise<string | null> => {
+      const project = projects.find((p) => p.id === id);
+      const target = project?.scenes.find((s) => s.id === sceneId);
+      if (!project || !target) return "Scéna nenalezena.";
+      const narration = target.narration.trim();
+      if (narration.length < 3) return "Scéna nemá text k namluvení.";
+
+      patchScene(id, sceneId, { audioStatus: "running", audioError: null });
+      try {
+        const { path, seconds } = (await callVoice({
+          data: {
+            projectId: project.id,
+            sceneId,
+            narration,
+            voice: project.brief.voice,
+            language: project.brief.language,
+          },
+        })) as { path: string; seconds: number };
+        patchScene(id, sceneId, {
+          audioStatus: "done",
+          audioPath: path,
+          audioSeconds: seconds,
+          audioError: null,
+        });
+        return null;
+      } catch (err) {
+        const message = errorMessage(err);
+        patchScene(id, sceneId, { audioStatus: "error", audioError: message });
+        return message;
+      }
+    },
+    [callVoice, patchScene, projects],
+  );
+
+
 
   const regenerateScript = useCallback(
     async (id: string): Promise<string | null> => {
@@ -351,6 +391,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       regenerateScript,
       regenerateScene,
       generateVisual,
+      generateVoice,
     }),
     [
       projects,
@@ -366,7 +407,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       regenerateScript,
       regenerateScene,
       generateVisual,
-
+      generateVoice,
     ],
   );
 

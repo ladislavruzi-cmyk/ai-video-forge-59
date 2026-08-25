@@ -48,6 +48,10 @@ export function normalizeScenes(raw: RawScene[], targetSeconds: number): Scene[]
     visualStatus: "waiting" as const,
     imagePath: null,
     visualError: null,
+    audioStatus: "waiting" as const,
+    audioPath: null,
+    audioSeconds: null,
+    audioError: null,
   }));
 }
 
