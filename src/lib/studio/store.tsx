@@ -75,6 +75,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const callScenes = useServerFn(generateScenesFn);
   const callScene = useServerFn(regenerateSceneFn);
   const callVisual = useServerFn(generateSceneVisualFn);
+  const callVoice = useServerFn(generateSceneVoiceFn);
 
 
   useEffect(() => {
