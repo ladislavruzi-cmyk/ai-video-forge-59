@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
+import { validateRenderedMp4 } from "./mp4.server";
 import {
   buildRenderSource,
   createRender,
