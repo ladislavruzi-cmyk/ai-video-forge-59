@@ -146,9 +146,6 @@ export function inspectMp4(bytes: Uint8Array): Mp4Facts {
     }
   });
 
-    }
-  });
-
   return facts;
 }
 
