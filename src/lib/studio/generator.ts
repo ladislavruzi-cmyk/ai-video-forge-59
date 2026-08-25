@@ -48,8 +48,9 @@ export function normalizeScenes(raw: RawScene[], targetSeconds: number): Scene[]
     visualStatus: "waiting" as const,
     imagePath: null,
     visualError: null,
-
+  }));
 }
+
 
 export function toRawScene(scene: Scene): RawScene {
   return {
