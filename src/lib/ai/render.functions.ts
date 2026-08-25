@@ -68,6 +68,11 @@ function toView(row: JobRow, videoUrl: string | null): RenderJobView {
     stage: row.stage,
     progress: row.progress,
     videoUrl,
+    downloadUrl: videoUrl
+      ? videoUrl.includes("/storage/v1/object/sign/")
+        ? `${videoUrl}&download=video.mp4`
+        : videoUrl
+      : null,
     storagePath: row.storage_path,
     durationSeconds: row.duration_seconds === null ? null : Number(row.duration_seconds),
     sceneCount: row.scene_count,
