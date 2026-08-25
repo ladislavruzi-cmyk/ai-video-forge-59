@@ -336,36 +336,91 @@ function ProjectPage() {
 
         {tab === "vizualy" && (
           <section className="space-y-4">
-            <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Vizuály</h3>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Vizuály</h3>
+              <button
+                disabled={busy !== null}
+                onClick={async () => {
+                  setNote(null);
+                  setErr(null);
+                  let failed = 0;
+                  for (const scene of project.scenes) {
+                    setBusy(`vis-${scene.id}`);
+                    const message = await generateVisual(project.id, scene.id);
+                    if (message) failed += 1;
+                  }
+                  setBusy(null);
+                  if (failed > 0) setErr(`${failed} scén(y) se nepodařilo vygenerovat. Zkus je znovu jednotlivě.`);
+                  else setNote("Vizuály všech scén byly vygenerovány.");
+                }}
+                className="flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-brand-foreground disabled:opacity-60"
+              >
+                <ImagePlus className="size-4" />
+                Vygenerovat všechny vizuály
+              </button>
+            </div>
             <div className="grid gap-4 sm:grid-cols-2">
-              {project.scenes.map((scene) => (
-                <figure key={scene.id} className="overflow-hidden rounded-xl border border-border bg-surface">
-                  <img
-                    src={scenePreview}
-                    alt={`Náhled scény ${scene.index}: ${scene.title}`}
-                    loading="lazy"
-                    width={1280}
-                    height={720}
-                    className="aspect-video w-full object-cover opacity-70"
-                  />
-                  <figcaption className="space-y-2 p-3">
-                    <p className="text-xs font-semibold">
-                      Scéna {scene.index} — {scene.title}
-                    </p>
-                    <p className="line-clamp-2 text-[11px] text-muted-foreground">{scene.visualPrompt}</p>
-                    <button
-                      onClick={() => setNote(`Regenerace scény ${scene.index} se spustí po připojení AI obrázkového API.`)}
-                      className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-cyan"
-                    >
-                      <RefreshCw className="size-3" />
-                      Regenerovat scénu
-                    </button>
-                  </figcaption>
-                </figure>
-              ))}
+              {project.scenes.map((scene) => {
+                const status = scene.visualStatus ?? "waiting";
+                const generating = busy === `vis-${scene.id}` || status === "running";
+                return (
+                  <figure key={scene.id} className="overflow-hidden rounded-xl border border-border bg-surface">
+                    <SceneImage
+                      path={scene.imagePath}
+                      alt={`Náhled scény ${scene.index}: ${scene.title}`}
+                    />
+                    <figcaption className="space-y-2 p-3">
+                      <div className="flex items-center justify-between gap-2 text-[10px] font-bold uppercase tracking-wider">
+                        <span className="text-muted-foreground">Scéna {scene.index}</span>
+                        <span
+                          className={
+                            status === "done"
+                              ? "text-status-done"
+                              : status === "error"
+                                ? "text-status-error"
+                                : status === "running"
+                                  ? "text-cyan"
+                                  : "text-muted-foreground"
+                          }
+                        >
+                          {VISUAL_STATUS_LABEL[generating ? "running" : status]}
+                        </span>
+                      </div>
+                      <p className="text-xs font-semibold">{scene.title}</p>
+                      <p className="line-clamp-2 font-mono text-[11px] text-muted-foreground">
+                        {scene.visualPrompt}
+                      </p>
+                      {scene.visualError && (
+                        <p className="text-[11px] text-status-error">{scene.visualError}</p>
+                      )}
+                      <button
+                        disabled={busy !== null}
+                        onClick={async () => {
+                          setNote(null);
+                          setErr(null);
+                          setBusy(`vis-${scene.id}`);
+                          const message = await generateVisual(project.id, scene.id);
+                          setBusy(null);
+                          if (message) setErr(message);
+                          else setNote(`Vizuál scény ${scene.index} je hotový.`);
+                        }}
+                        className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-cyan disabled:opacity-60"
+                      >
+                        <RefreshCw className={`size-3 ${generating ? "animate-spin" : ""}`} />
+                        {generating
+                          ? "Generuji…"
+                          : scene.imagePath
+                            ? "Regenerovat vizuál"
+                            : "Vygenerovat vizuál"}
+                      </button>
+                    </figcaption>
+                  </figure>
+                );
+              })}
             </div>
           </section>
         )}
+
 
         {tab === "hudba" && (
           <section className="space-y-4">
