@@ -52,7 +52,9 @@ interface StudioContextValue {
   deleteProject: (id: string) => void;
   regenerateScript: (id: string) => Promise<string | null>;
   regenerateScene: (id: string, sceneId: string) => Promise<string | null>;
+  generateVisual: (id: string, sceneId: string) => Promise<string | null>;
 }
+
 
 const StudioContext = createContext<StudioContextValue | null>(null);
 
