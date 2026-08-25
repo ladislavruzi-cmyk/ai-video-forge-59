@@ -196,12 +196,26 @@ export function RenderPanel({
 
         {ready && job.videoUrl && (
           <video
+            key={job.videoUrl}
             src={job.videoUrl}
             controls
+            playsInline
             preload="metadata"
+            onError={() => void refreshUrl(job.id)}
             className="w-full rounded-xl border border-border bg-black"
           />
         )}
+
+        {ready && (
+          <button
+            onClick={() => void refreshUrl(job.id)}
+            className="flex items-center justify-center gap-2 rounded-xl border border-border bg-surface-2 py-2 text-xs font-medium"
+          >
+            <RefreshCw className="size-3.5" />
+            Obnovit odkaz na video
+          </button>
+        )}
+
       </div>
 
       <button
