@@ -32,6 +32,8 @@ import {
   enqueueVisualJobsFn,
   processVisualQueueFn,
 } from "@/lib/ai/queue.functions";
+import { inspectSceneMediaFn, type SceneMediaResult } from "@/lib/ai/sync.functions";
+import { buildTimeline } from "./timeline";
 import { supabase } from "@/integrations/supabase/client";
 import {
   fetchActiveVisualJobs,
