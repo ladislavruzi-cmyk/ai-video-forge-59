@@ -26,7 +26,7 @@ export async function saveProject(project: VideoProject): Promise<void> {
       title: project.title,
       word_count: project.wordCount ?? 0,
       total_seconds: project.totalSeconds,
-      data: project as unknown as Record<string, unknown>,
+      data: JSON.parse(JSON.stringify(project)),
     },
     { onConflict: "id" },
   );
