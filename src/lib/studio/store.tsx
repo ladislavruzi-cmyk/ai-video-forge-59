@@ -26,6 +26,7 @@ import {
 } from "./types";
 import { generateScenesFn, generateScriptFn, regenerateSceneFn } from "@/lib/ai/pipeline.functions";
 import { generateSceneVisualFn } from "@/lib/ai/visuals.functions";
+import { generateSceneVoiceFn } from "@/lib/ai/voice.functions";
 import { fetchProjects, removeProject, saveProject } from "./projects.repo";
 
 
