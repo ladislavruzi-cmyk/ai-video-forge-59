@@ -15,7 +15,14 @@ export interface Mp4Facts {
   seconds: number | null;
   /** Rychlá indikace faststart (moov před mdat) pro streamování v prohlížeči. */
   fastStart: boolean;
+  /** Kód formátu obrazové stopy (avc1 = H.264, hvc1 = H.265). */
+  videoCodec: string | null;
+  /** Kód formátu zvukové stopy (mp4a = AAC). */
+  audioCodec: string | null;
+  /** Velikost souboru v bajtech. */
+  bytes: number;
 }
+
 
 function u32(b: Uint8Array, o: number): number {
   return ((b[o]! << 24) | (b[o + 1]! << 16) | (b[o + 2]! << 8) | b[o + 3]!) >>> 0;
