@@ -72,6 +72,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const callScript = useServerFn(generateScriptFn);
   const callScenes = useServerFn(generateScenesFn);
   const callScene = useServerFn(regenerateSceneFn);
+  const callVisual = useServerFn(generateSceneVisualFn);
+
 
   useEffect(() => {
     void fetchProjects()
