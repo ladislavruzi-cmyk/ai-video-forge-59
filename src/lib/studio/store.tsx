@@ -38,6 +38,17 @@ function errorMessage(err: unknown): string {
   return raw || "Generování selhalo. Zkus to prosím znovu.";
 }
 
+export type VisualBatchMode = "missing" | "errors" | "all";
+
+export interface VisualBatchState {
+  projectId: string;
+  running: boolean;
+  total: number;
+  completed: number;
+  failed: number;
+  currentIndex: number | null;
+}
+
 interface StudioContextValue {
   projects: VideoProject[];
   steps: WorkflowStep[];
@@ -55,7 +66,11 @@ interface StudioContextValue {
   regenerateScene: (id: string, sceneId: string) => Promise<string | null>;
   generateVisual: (id: string, sceneId: string) => Promise<string | null>;
   generateVoice: (id: string, sceneId: string) => Promise<string | null>;
+  visualBatch: VisualBatchState | null;
+  generateVisualsBatch: (id: string, mode: VisualBatchMode) => Promise<void>;
+  cancelVisualBatch: () => void;
 }
+
 
 
 const StudioContext = createContext<StudioContextValue | null>(null);
