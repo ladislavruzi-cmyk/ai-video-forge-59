@@ -391,6 +391,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       regenerateScript,
       regenerateScene,
       generateVisual,
+      generateVoice,
     }),
     [
       projects,
@@ -406,7 +407,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       regenerateScript,
       regenerateScene,
       generateVisual,
-
+      generateVoice,
     ],
   );
 
