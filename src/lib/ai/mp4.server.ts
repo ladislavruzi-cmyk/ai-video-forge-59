@@ -65,7 +65,11 @@ export function inspectMp4(bytes: Uint8Array): Mp4Facts {
     height: null,
     seconds: null,
     fastStart: false,
+    videoCodec: null,
+    audioCodec: null,
+    bytes: bytes.byteLength,
   };
+
   if (bytes.byteLength < 32) return facts;
 
   let moovAt = -1;
