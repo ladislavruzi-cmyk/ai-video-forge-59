@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { AppShell } from "@/components/studio/AppShell";
 import { SceneImage } from "@/components/studio/SceneImage";
+import { SceneAudio } from "@/components/studio/SceneAudio";
 import { useStudio } from "@/lib/studio/store";
 import {
   STEP_STATUS_LABEL,
@@ -50,7 +51,8 @@ const TABS = [
 
 function ProjectPage() {
   const { id } = Route.useParams();
-  const { getProject, updateProject, regenerateScript, regenerateScene, generateVisual } = useStudio();
+  const { getProject, updateProject, regenerateScript, regenerateScene, generateVisual, generateVoice } =
+    useStudio();
   const project = getProject(id);
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("scenar");
   const [note, setNote] = useState<string | null>(null);
