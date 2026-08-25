@@ -404,3 +404,25 @@ export const latestRenderFn = createServerFn({ method: "POST" })
     if (!row) return { job: null as RenderJobView | null };
     return { job: toView(row, await resolveVideoUrl(supabase, row)) };
   });
+
+const refreshSchema = z.object({ jobId: z.string().min(1) });
+
+/**
+ * Obnoví podepsaný odkaz na hotové MP4. Podepsané odkazy mají omezenou
+ * platnost — po expiraci by přehrávač zůstal na černé obrazovce.
+ */
+export const refreshRenderUrlFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => refreshSchema.parse(input))
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const { data: row, error } = await supabase
+      .from("render_jobs")
+      .select(JOB_COLUMNS)
+      .eq("id", data.jobId)
+      .maybeSingle();
+    if (error) throw new Error(`Odkaz na video se nepodařilo obnovit: ${error.message}`);
+    if (!row) throw new Error("Render úloha nebyla nalezena.");
+    const job = row as unknown as JobRow;
+    return { job: toView(job, await resolveVideoUrl(supabase, job)) };
+  });
