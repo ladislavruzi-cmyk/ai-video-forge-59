@@ -50,7 +50,7 @@ const TABS = [
 
 function ProjectPage() {
   const { id } = Route.useParams();
-  const { getProject, updateProject, regenerateScript, regenerateScene } = useStudio();
+  const { getProject, updateProject, regenerateScript, regenerateScene, generateVisual } = useStudio();
   const project = getProject(id);
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("scenar");
   const [note, setNote] = useState<string | null>(null);
