@@ -13,6 +13,8 @@ import {
 import { AppShell } from "@/components/studio/AppShell";
 import { SceneImage } from "@/components/studio/SceneImage";
 import { SceneAudio } from "@/components/studio/SceneAudio";
+import { RenderPanel } from "@/components/studio/RenderPanel";
+
 import { useStudio } from "@/lib/studio/store";
 import { formatSeconds } from "@/lib/studio/timeline";
 import {
