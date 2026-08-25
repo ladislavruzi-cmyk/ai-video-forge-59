@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Check, KeyRound, X } from "lucide-react";
+import { Check, KeyRound, LogOut, ShieldCheck, X } from "lucide-react";
+import { useAuth } from "@/lib/auth/useAuth";
 import { AppShell } from "@/components/studio/AppShell";
 import { getIntegrationStatus } from "@/lib/ai/pipeline.functions";
 
@@ -21,6 +22,7 @@ export const Route = createFileRoute("/_authenticated/nastaveni")({
 });
 
 function SettingsPage() {
+  const { email, signOut } = useAuth();
   const fetchStatus = useServerFn(getIntegrationStatus);
   const { data, isLoading } = useQuery({
     queryKey: ["integration-status"],
@@ -36,6 +38,35 @@ function SettingsPage() {
             Klíče se ukládají výhradně na serveru. Frontend je nikdy nevidí.
           </p>
         </div>
+
+        <section className="rounded-2xl border border-border bg-surface p-5">
+          <h3 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-muted-foreground">
+            <ShieldCheck className="size-4 text-cyan" />
+            Účet
+          </h3>
+          <dl className="mt-4 space-y-3 text-sm">
+            <div className="flex items-center justify-between gap-3">
+              <dt className="text-muted-foreground">Přihlášen jako</dt>
+              <dd className="truncate font-medium">{email ?? "—"}</dd>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <dt className="text-muted-foreground">Veřejná registrace</dt>
+              <dd className="font-medium text-status-done">Zakázána</dd>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <dt className="text-muted-foreground">Projekty</dt>
+              <dd className="font-medium">Soukromé, chráněné RLS</dd>
+            </div>
+          </dl>
+          <button
+            type="button"
+            onClick={() => void signOut()}
+            className="mt-5 flex items-center gap-2 rounded-xl border border-border px-3.5 py-2 text-xs font-bold uppercase tracking-wider text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
+          >
+            <LogOut className="size-3.5" />
+            Odhlásit se
+          </button>
+        </section>
 
         <div className="rounded-2xl border border-border bg-surface p-5">
           <h3 className="flex items-center gap-2 text-sm font-bold">
