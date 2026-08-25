@@ -59,6 +59,27 @@ export interface Scene {
   /** Délka vygenerovaného audia v sekundách. */
   audioSeconds?: number | null;
   audioError?: string | null;
+  /** Stav synchronizace obrazu a zvuku scény. */
+  syncStatus?: StepStatus;
+  syncError?: string | null;
+  /** Skutečná délka dabingu zjištěná ze souboru (s). */
+  audioDuration?: number | null;
+  /** Délka vizuálu přizpůsobená délce dabingu včetně přechodu (s). */
+  visualDuration?: number | null;
+  /** Pozice scény na časové ose (s). */
+  startTime?: number | null;
+  endTime?: number | null;
+  /** Délka přechodu do následující scény (s). */
+  transitionSeconds?: number | null;
+}
+
+/** Data časové osy připravená pro následný render. */
+export interface SyncTimeline {
+  syncedAt: string;
+  totalSeconds: number;
+  sceneCount: number;
+  syncedScenes: number;
+  failedScenes: number;
 }
 
 
