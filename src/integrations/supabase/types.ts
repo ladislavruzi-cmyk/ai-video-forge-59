@@ -47,6 +47,63 @@ export type Database = {
         }
         Relationships: []
       }
+      render_jobs: {
+        Row: {
+          created_at: string
+          duration_seconds: number | null
+          error: string | null
+          finished_at: string | null
+          id: string
+          output_url: string | null
+          progress: number | null
+          project_id: string
+          provider: string
+          provider_render_id: string | null
+          scene_count: number | null
+          stage: string | null
+          status: string
+          storage_path: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          duration_seconds?: number | null
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          output_url?: string | null
+          progress?: number | null
+          project_id: string
+          provider?: string
+          provider_render_id?: string | null
+          scene_count?: number | null
+          stage?: string | null
+          status?: string
+          storage_path?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          duration_seconds?: number | null
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          output_url?: string | null
+          progress?: number | null
+          project_id?: string
+          provider?: string
+          provider_render_id?: string | null
+          scene_count?: number | null
+          stage?: string | null
+          status?: string
+          storage_path?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       visual_jobs: {
         Row: {
           aspect_ratio: string

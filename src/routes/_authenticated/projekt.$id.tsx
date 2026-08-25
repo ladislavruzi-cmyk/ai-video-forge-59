@@ -13,6 +13,8 @@ import {
 import { AppShell } from "@/components/studio/AppShell";
 import { SceneImage } from "@/components/studio/SceneImage";
 import { SceneAudio } from "@/components/studio/SceneAudio";
+import { RenderPanel } from "@/components/studio/RenderPanel";
+
 import { useStudio } from "@/lib/studio/store";
 import { formatSeconds } from "@/lib/studio/timeline";
 import {
@@ -784,25 +786,13 @@ function ProjectPage() {
         )}
 
         {tab === "export" && (
-          <section className="space-y-3">
-            <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Export</h3>
-            <button
-              onClick={() => {
-                updateProject(project.id, { state: "Exportováno" });
-                setNote("Export byl zařazen do fronty. Skutečný rendering proběhne po připojení render API.");
+          <div className="space-y-3">
+            <RenderPanel
+              project={project}
+              onStateChange={(state) => {
+                if (project.state !== state) updateProject(project.id, { state });
               }}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-cyan py-4 text-sm font-bold uppercase tracking-wider text-cyan-foreground shadow-cyan"
-            >
-              <Upload className="size-4" />
-              Exportovat video
-            </button>
-            <button
-              onClick={() => setNote("Stažení bude dostupné po dokončení renderingu na serveru.")}
-              className="flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-surface py-3.5 text-sm font-medium"
-            >
-              <Download className="size-4" />
-              Stáhnout video
-            </button>
+            />
             <button
               onClick={() => setNote("Metadata pro YouTube se vygenerují po připojení YouTube API.")}
               className="flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-surface py-3.5 text-sm font-medium"
@@ -810,8 +800,9 @@ function ProjectPage() {
               <Youtube className="size-4" />
               Připravit pro YouTube
             </button>
-          </section>
+          </div>
         )}
+
       </div>
     </AppShell>
   );
