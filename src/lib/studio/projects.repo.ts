@@ -16,12 +16,12 @@ const STALE_AUDIO_MSG =
  * nebo zavře, požadavek se zruší a v databázi zůstane zaseknuté "Generuje se".
  * Při načtení proto takové scény označíme jako Chybu — hotové scény necháme být.
  */
-function healStaleScenes(project: VideoProject): VideoProject {
+function healStaleScenes(project: VideoProject, activeVisualScenes: Set<string>): VideoProject {
   return {
     ...project,
     scenes: (project.scenes ?? []).map((s) => ({
       ...s,
-      ...(s.visualStatus === "running" && !s.imagePath
+      ...(s.visualStatus === "running" && !s.imagePath && !activeVisualScenes.has(s.id)
         ? { visualStatus: "error" as const, visualError: s.visualError ?? STALE_VISUAL_MSG }
         : {}),
       ...(s.audioStatus === "running" && !s.audioPath
@@ -31,15 +31,36 @@ function healStaleScenes(project: VideoProject): VideoProject {
   };
 }
 
+/** Scény, které právě čekají nebo běží v serverové frontě — ty neléčíme. */
+export async function fetchActiveVisualJobs(): Promise<
+  { projectId: string; sceneId: string; status: string }[]
+> {
+  const { data, error } = await supabase
+    .from("visual_jobs")
+    .select("project_id, scene_id, status")
+    .in("status", ["pending", "running"]);
+  if (error) return [];
+  return (data ?? []).map((r) => ({
+    projectId: r.project_id as string,
+    sceneId: r.scene_id as string,
+    status: r.status as string,
+  }));
+}
+
 export async function fetchProjects(): Promise<VideoProject[]> {
+  const active = new Set((await fetchActiveVisualJobs()).map((j) => `${j.projectId}:${j.sceneId}`));
   const { data, error } = await supabase
     .from("projects")
     .select("id, data")
     .order("created_at", { ascending: false });
   if (error) throw error;
-  return (data ?? []).map((row) =>
-    healStaleScenes({ ...(row.data as unknown as VideoProject), id: row.id }),
-  );
+  return (data ?? []).map((row) => {
+    const project = { ...(row.data as unknown as VideoProject), id: row.id };
+    const activeScenes = new Set(
+      [...active].filter((k) => k.startsWith(`${project.id}:`)).map((k) => k.split(":")[1] ?? ""),
+    );
+    return healStaleScenes(project, activeScenes);
+  });
 }
 
 
