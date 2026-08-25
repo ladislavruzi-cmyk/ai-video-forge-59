@@ -75,6 +75,26 @@ export function RenderPanel({
     [callStatus, onStateChange],
   );
 
+  /** Obnoví podepsaný odkaz — po expiraci by přehrávač zůstal černý. */
+  const refreshUrl = useCallback(
+    async (jobId: string) => {
+      try {
+        const { job: fresh } = (await callRefresh({ data: { jobId } })) as { job: RenderJobView };
+        setJob(fresh);
+      } catch {
+        setError("Odkaz na video vypršel a nepodařilo se ho obnovit. Zkus stránku načíst znovu.");
+      }
+    },
+    [callRefresh],
+  );
+
+  useEffect(() => {
+    if (job?.status !== "done") return;
+    const id = job.id;
+    const interval = setInterval(() => void refreshUrl(id), 30 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [job?.status, job?.id, refreshUrl]);
+
   useEffect(() => {
     let alive = true;
     void callLatest({ data: { projectId } })
