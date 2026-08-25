@@ -52,6 +52,13 @@ export interface Scene {
   /** Cesta k obrázku v privátním úložišti. */
   imagePath?: string | null;
   visualError?: string | null;
+  /** Stav generování dabingu scény. */
+  audioStatus?: StepStatus;
+  /** Cesta k audiu v privátním úložišti. */
+  audioPath?: string | null;
+  /** Délka vygenerovaného audia v sekundách. */
+  audioSeconds?: number | null;
+  audioError?: string | null;
 }
 
 
