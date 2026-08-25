@@ -115,6 +115,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const callEnqueue = useServerFn(enqueueVisualJobsFn);
   const callProcessQueue = useServerFn(processVisualQueueFn);
   const callCancelJobs = useServerFn(cancelVisualJobsFn);
+  const callInspect = useServerFn(inspectSceneMediaFn);
 
 
   useEffect(() => {
@@ -652,6 +653,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       visualBatch,
       generateVisualsBatch,
       cancelVisualBatch,
+      syncScenes,
     }),
     [
       projects,
@@ -671,6 +673,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       visualBatch,
       generateVisualsBatch,
       cancelVisualBatch,
+      syncScenes,
     ],
   );
 
