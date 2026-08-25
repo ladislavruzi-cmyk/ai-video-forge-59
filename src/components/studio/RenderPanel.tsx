@@ -26,6 +26,24 @@ function stageIndex(job: RenderJobView | null): number {
   return 2;
 }
 
+const CODEC_LABEL: Record<string, string> = {
+  avc1: "H.264 (avc1)",
+  avc3: "H.264 (avc3)",
+  hvc1: "H.265 (hvc1)",
+  hev1: "H.265 (hev1)",
+  mp4a: "AAC (mp4a)",
+};
+
+function codec(value: string | null): string {
+  if (!value) return "neurčeno";
+  return CODEC_LABEL[value] ?? value;
+}
+
+function megabytes(bytes: number | null): string {
+  if (!bytes) return "neurčeno";
+  return `${(bytes / 1024 / 1024).toFixed(2)} MB (${bytes.toLocaleString("cs-CZ")} B)`;
+}
+
 const STATUS_LABEL: Record<RenderJobView["status"], string> = {
   pending: "Render čeká",
   rendering: "Renderování videa…",
@@ -129,6 +147,11 @@ export function RenderPanel({
   const ready = job?.status === "done" && !!job.videoUrl;
   const current = stageIndex(job);
 
+  const targetLabel = project.brief.aspectRatio === "9:16" ? "1080×1920" : "1920×1080";
+  const targetShort = project.brief.aspectRatio === "9:16" ? 1080 : 1920;
+  const belowFullHd =
+    job?.status === "done" && !!job.width && !!job.height && Math.max(job.width, job.height) < targetShort;
+
   const scenesReady = project.scenes.filter((s) => s.imagePath && s.audioPath && s.visualDuration).length;
   const allReady = scenesReady === project.scenes.length && project.scenes.length > 0;
 
@@ -147,7 +170,7 @@ export function RenderPanel({
         </div>
 
         <p className="text-xs text-muted-foreground">
-          Render skládá MP4 (H.264/AAC, {project.brief.aspectRatio === "9:16" ? "1080×1920" : "1920×1080"})
+          Render skládá MP4 (H.264/AAC, požadováno {targetLabel})
           z už hotových vizuálů, dabingu a synchronizované časové osy. Nic se negeneruje znovu.
         </p>
 
@@ -204,6 +227,42 @@ export function RenderPanel({
             onError={() => void refreshUrl(job.id)}
             className="w-full rounded-xl border border-border bg-black"
           />
+        )}
+
+        {ready && (
+          <div className="space-y-2 rounded-xl border border-border bg-surface-2 p-3">
+            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+              Ověřeno z výsledného souboru
+            </p>
+            <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+              <dt className="text-muted-foreground">Rozlišení</dt>
+              <dd className="font-medium">
+                {job.width && job.height ? `${job.width}×${job.height}` : "neurčeno"}
+              </dd>
+              <dt className="text-muted-foreground">Video kodek</dt>
+              <dd className="font-medium">{codec(job.videoCodec)}</dd>
+              <dt className="text-muted-foreground">Audio kodek</dt>
+              <dd className="font-medium">{codec(job.audioCodec)}</dd>
+              <dt className="text-muted-foreground">Délka</dt>
+              <dd className="font-medium">
+                {job.durationSeconds ? formatSeconds(job.durationSeconds) : "neurčeno"}
+              </dd>
+              <dt className="text-muted-foreground">Velikost souboru</dt>
+              <dd className="font-medium">{megabytes(job.fileBytes)}</dd>
+            </dl>
+          </div>
+        )}
+
+        {ready && belowFullHd && (
+          <p className="flex items-start gap-2 rounded-xl border border-status-running/40 bg-status-running/10 p-3 text-xs">
+            <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
+            <span>
+              Export je dokončen, ale aktuální renderovací služba poskytuje pouze{" "}
+              {job.width}×{job.height}. Pro Full HD {targetLabel} je nutný tarif/služba s podporou
+              Full HD. Vizuály, dabing ani synchronizace se nemažou — po navýšení tarifu stačí
+              spustit render znovu.
+            </span>
+          </p>
         )}
 
         {ready && (
