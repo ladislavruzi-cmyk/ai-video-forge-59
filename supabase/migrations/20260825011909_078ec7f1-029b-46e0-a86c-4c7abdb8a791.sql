@@ -1,0 +1,4 @@
+CREATE POLICY "Users can read own scene audio" ON storage.objects FOR SELECT TO authenticated USING (bucket_id = 'scene-audio' AND (storage.foldername(name))[1] = auth.uid()::text);
+CREATE POLICY "Users can upload own scene audio" ON storage.objects FOR INSERT TO authenticated WITH CHECK (bucket_id = 'scene-audio' AND (storage.foldername(name))[1] = auth.uid()::text);
+CREATE POLICY "Users can update own scene audio" ON storage.objects FOR UPDATE TO authenticated USING (bucket_id = 'scene-audio' AND (storage.foldername(name))[1] = auth.uid()::text);
+CREATE POLICY "Users can delete own scene audio" ON storage.objects FOR DELETE TO authenticated USING (bucket_id = 'scene-audio' AND (storage.foldername(name))[1] = auth.uid()::text);
