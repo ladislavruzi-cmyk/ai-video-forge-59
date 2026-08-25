@@ -32,6 +32,12 @@ export interface RenderJobView {
   storagePath: string | null;
   durationSeconds: number | null;
   sceneCount: number | null;
+  /** Skutečně ověřené parametry výsledného MP4 (ne požadované hodnoty). */
+  width: number | null;
+  height: number | null;
+  videoCodec: string | null;
+  audioCodec: string | null;
+  fileBytes: number | null;
   error: string | null;
   createdAt: string;
   finishedAt: string | null;
@@ -47,13 +53,18 @@ type JobRow = {
   storage_path: string | null;
   duration_seconds: number | string | null;
   scene_count: number | null;
+  width: number | null;
+  height: number | null;
+  video_codec: string | null;
+  audio_codec: string | null;
+  file_bytes: number | string | null;
   error: string | null;
   created_at: string;
   finished_at: string | null;
 };
 
 const JOB_COLUMNS =
-  "id, project_id, provider_render_id, status, stage, progress, output_url, storage_path, duration_seconds, scene_count, error, created_at, finished_at";
+  "id, project_id, provider_render_id, status, stage, progress, output_url, storage_path, duration_seconds, scene_count, width, height, video_codec, audio_codec, file_bytes, error, created_at, finished_at";
 
 function toView(row: JobRow, videoUrl: string | null): RenderJobView {
   const status = (["pending", "rendering", "done", "error"] as const).includes(
@@ -76,6 +87,11 @@ function toView(row: JobRow, videoUrl: string | null): RenderJobView {
     storagePath: row.storage_path,
     durationSeconds: row.duration_seconds === null ? null : Number(row.duration_seconds),
     sceneCount: row.scene_count,
+    width: row.width,
+    height: row.height,
+    videoCodec: row.video_codec,
+    audioCodec: row.audio_codec,
+    fileBytes: row.file_bytes === null ? null : Number(row.file_bytes),
     error: row.error,
     createdAt: row.created_at,
     finishedAt: row.finished_at,
@@ -362,6 +378,11 @@ export const renderStatusFn = createServerFn({ method: "POST" })
         output_url: provider.url,
         storage_path: path,
         duration_seconds: facts.seconds ?? expected,
+        width: facts.width,
+        height: facts.height,
+        video_codec: facts.videoCodec,
+        audio_codec: facts.audioCodec,
+        file_bytes: bytes.byteLength,
         error: null,
         finished_at: new Date().toISOString(),
       })
