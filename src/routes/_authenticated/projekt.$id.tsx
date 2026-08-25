@@ -14,6 +14,7 @@ import { AppShell } from "@/components/studio/AppShell";
 import { SceneImage } from "@/components/studio/SceneImage";
 import { SceneAudio } from "@/components/studio/SceneAudio";
 import { useStudio } from "@/lib/studio/store";
+import { formatSeconds } from "@/lib/studio/timeline";
 import {
   STEP_STATUS_LABEL,
   VISUAL_STATUS_LABEL,
@@ -42,8 +43,9 @@ export const Route = createFileRoute("/_authenticated/projekt/$id")({
 const TABS = [
   { id: "scenar", label: "Scénář" },
   { id: "sceny", label: "Scény" },
-  { id: "dabing", label: "Dabing" },
   { id: "vizualy", label: "Vizuály" },
+  { id: "dabing", label: "Dabing" },
+  { id: "sync", label: "Synchronizace" },
   { id: "hudba", label: "Hudba a efekty" },
   { id: "titulky", label: "Titulky" },
   { id: "export", label: "Export" },
@@ -61,6 +63,7 @@ function ProjectPage() {
     visualBatch,
     generateVisualsBatch,
     cancelVisualBatch,
+    syncScenes,
   } = useStudio();
   const project = getProject(id);
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("scenar");
@@ -602,6 +605,133 @@ function ProjectPage() {
           </section>
         )}
 
+
+        {tab === "sync" && (
+          <section className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground">
+                Synchronizace obrazu a zvuku
+              </h3>
+              <button
+                disabled={busy !== null}
+                onClick={async () => {
+                  setNote(null);
+                  setErr(null);
+                  setBusy("sync-all");
+                  const { synced, failed } = await syncScenes(project.id);
+                  setBusy(null);
+                  if (failed > 0)
+                    setErr(`${failed} scén(y) se nepodařilo synchronizovat — detail najdeš u dané scény.`);
+                  if (synced > 0)
+                    setNote(`Synchronizováno ${synced} scén. Časová osa je připravena pro render.`);
+                }}
+                className="flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-brand-foreground disabled:opacity-60"
+              >
+                <RefreshCw className={`size-4 ${busy === "sync-all" ? "animate-spin" : ""}`} />
+                Synchronizovat všechny scény
+              </button>
+            </div>
+
+            <div className="rounded-2xl border border-border bg-surface p-5">
+              {project.timeline ? (
+                <>
+                  <p className="text-sm font-semibold">
+                    Časová osa: {formatSeconds(project.timeline.totalSeconds)} •{" "}
+                    {project.timeline.syncedScenes}/{project.timeline.sceneCount} scén
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Poslední synchronizace:{" "}
+                    {new Date(project.timeline.syncedAt).toLocaleString("cs-CZ")}
+                    {project.timeline.failedScenes > 0
+                      ? ` • chyby: ${project.timeline.failedScenes}`
+                      : ""}
+                  </p>
+                </>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Synchronizace použije už uložené vizuály a dabing. Nic se negeneruje znovu —
+                  ze souborů se přečtou skutečné délky a sestaví se časová osa.
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-3">
+              {project.scenes.map((scene) => {
+                const syncStatus = scene.syncStatus ?? "waiting";
+                const running = busy === "sync-all" || busy === `sync-${scene.id}`;
+                const hasVisual = Boolean(scene.imagePath);
+                const hasAudio = Boolean(scene.audioPath);
+                const ready = hasVisual && hasAudio;
+                return (
+                  <article key={scene.id} className="space-y-3 rounded-2xl border border-border bg-surface p-4">
+                    <div className="flex items-center justify-between gap-2 text-[10px] font-bold uppercase tracking-wider">
+                      <span className="text-muted-foreground">Scéna {scene.index}</span>
+                      <span
+                        className={
+                          syncStatus === "done"
+                            ? "text-status-done"
+                            : syncStatus === "error"
+                              ? "text-status-error"
+                              : ready
+                                ? "text-cyan"
+                                : "text-muted-foreground"
+                        }
+                      >
+                        {running
+                          ? "Synchronizuji…"
+                          : syncStatus === "done"
+                            ? "Synchronizováno"
+                            : syncStatus === "error"
+                              ? "Chyba"
+                              : ready
+                                ? "Připraveno"
+                                : "Čeká na podklady"}
+                      </span>
+                    </div>
+                    <p className="text-xs font-semibold">{scene.title}</p>
+                    <dl className="grid grid-cols-2 gap-2 text-[11px]">
+                      <Meta label="Vizuál" value={hasVisual ? "Hotovo" : "Chybí"} accent={hasVisual} />
+                      <Meta label="Dabing" value={hasAudio ? "Hotovo" : "Chybí"} accent={hasAudio} />
+                      <Meta
+                        label="Délka dabingu"
+                        value={scene.audioDuration ? `${scene.audioDuration.toFixed(1)} s` : "—"}
+                      />
+                      <Meta
+                        label="Délka vizuálu"
+                        value={scene.visualDuration ? `${scene.visualDuration.toFixed(1)} s` : "—"}
+                      />
+                      <Meta label="Začátek" value={formatSeconds(scene.startTime)} />
+                      <Meta label="Konec" value={formatSeconds(scene.endTime)} />
+                    </dl>
+                    <p className="text-[11px] text-muted-foreground">
+                      Přechod: {scene.transition}
+                      {scene.transitionSeconds !== null && scene.transitionSeconds !== undefined
+                        ? ` (${scene.transitionSeconds.toFixed(1)} s)`
+                        : ""}
+                    </p>
+                    {scene.syncError && <p className="text-[11px] text-status-error">{scene.syncError}</p>}
+                    <button
+                      disabled={busy !== null}
+                      onClick={async () => {
+                        setNote(null);
+                        setErr(null);
+                        setBusy(`sync-${scene.id}`);
+                        const { failed } = await syncScenes(project.id, [scene.id]);
+                        setBusy(null);
+                        if (failed > 0) setErr(`Scénu ${scene.index} se nepodařilo synchronizovat.`);
+                        else setNote(`Scéna ${scene.index} je synchronizovaná.`);
+                      }}
+                      className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-cyan disabled:opacity-60"
+                    >
+                      <RefreshCw className={`size-3 ${running ? "animate-spin" : ""}`} />
+                      Synchronizovat scénu
+                    </button>
+                  </article>
+                );
+              })}
+            </div>
+          </section>
+        )}
 
         {tab === "hudba" && (
           <section className="space-y-4">
