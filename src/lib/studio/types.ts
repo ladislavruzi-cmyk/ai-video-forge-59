@@ -103,6 +103,8 @@ export interface VideoProject {
   tracks: SoundTrack[];
   subtitlesEnabled: boolean;
   steps: WorkflowStep[];
+  /** Výsledek posledního běhu synchronizace obrazu a zvuku. */
+  timeline?: SyncTimeline | null;
 }
 
 export const LENGTH_OPTIONS: { value: VideoLength; label: string; minutes: number }[] = [
