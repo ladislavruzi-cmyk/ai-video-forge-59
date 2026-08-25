@@ -27,7 +27,18 @@ import {
 import { generateScenesFn, generateScriptFn, regenerateSceneFn } from "@/lib/ai/pipeline.functions";
 import { generateSceneVisualFn } from "@/lib/ai/visuals.functions";
 import { generateSceneVoiceFn } from "@/lib/ai/voice.functions";
-import { fetchProjects, removeProject, saveProject } from "./projects.repo";
+import {
+  cancelVisualJobsFn,
+  enqueueVisualJobsFn,
+  processVisualQueueFn,
+} from "@/lib/ai/queue.functions";
+import { supabase } from "@/integrations/supabase/client";
+import {
+  fetchActiveVisualJobs,
+  fetchProjects,
+  removeProject,
+  saveProject,
+} from "./projects.repo";
 
 
 function errorMessage(err: unknown): string {
@@ -88,6 +99,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const projectsRef = useRef<VideoProject[]>(projects);
   projectsRef.current = projects;
   const [visualBatch, setVisualBatch] = useState<VisualBatchState | null>(null);
+  const [resumeProjectId, setResumeProjectId] = useState<string | null>(null);
   const batchRef = useRef(false);
   const cancelRef = useRef(false);
 
@@ -96,11 +108,19 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const callScene = useServerFn(regenerateSceneFn);
   const callVisual = useServerFn(generateSceneVisualFn);
   const callVoice = useServerFn(generateSceneVoiceFn);
+  const callEnqueue = useServerFn(enqueueVisualJobsFn);
+  const callProcessQueue = useServerFn(processVisualQueueFn);
+  const callCancelJobs = useServerFn(cancelVisualJobsFn);
 
 
   useEffect(() => {
     void fetchProjects()
-      .then(setProjects)
+      .then(async (list) => {
+        setProjects(list);
+        // Nedoběhnutá serverová fronta se po otevření aplikace sama rozjede dál.
+        const jobs = await fetchActiveVisualJobs().catch(() => []);
+        setResumeProjectId(jobs[0]?.projectId ?? null);
+      })
       .catch(() => {
         /* nepřihlášený nebo offline — gate routy uživatele přesměruje */
       });
@@ -295,11 +315,11 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   );
 
   /**
-   * Hromadné generování vizuálů: scény se zpracovávají POSTUPNĚ, jedna po druhé.
-   * Běží mimo React komponentu (v providerovi), takže přepnutí záložky nebo
-   * odchod z detailu projektu proces nezruší. Každá scéna se hned po dokončení
-   * ukládá do databáze, takže po obnovení stránky je stav známý a hotové scény
-   * se už nikdy negenerují znovu.
+   * Hromadné generování vizuálů běží jako SERVEROVÁ FRONTA (tabulka visual_jobs).
+   * Aplikace scény jen zařadí; jednu po druhé je zpracovává server — buď na
+   * pokyn otevřené stránky, nebo naplánovaná serverová úloha každou minutu.
+   * Zavření nebo obnovení stránky proto běh nezruší a hotové scény se nikdy
+   * negenerují znovu.
    */
   const generateVisualsBatch = useCallback(
     async (id: string, mode: VisualBatchMode): Promise<void> => {
@@ -314,7 +334,11 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         return !s.imagePath;
       });
 
-      if (queue.length === 0) {
+      const payload = queue
+        .filter((s) => s.visualPrompt.trim().length >= 3)
+        .map((s) => ({ sceneId: s.id, index: s.index, prompt: s.visualPrompt.trim() }));
+
+      if (payload.length === 0) {
         setVisualBatch({ projectId: id, running: false, total: 0, completed: 0, failed: 0, currentIndex: null });
         return;
       }
@@ -324,50 +348,89 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       setVisualBatch({
         projectId: id,
         running: true,
-        total: queue.length,
+        total: payload.length,
         completed: 0,
         failed: 0,
-        currentIndex: queue[0]?.index ?? null,
+        currentIndex: payload[0]?.index ?? null,
       });
 
-      let completed = 0;
-      let failed = 0;
-
-      for (const scene of queue) {
-        if (cancelRef.current) break;
-        // Scéna mohla být mezitím hotová (např. jednotlivým tlačítkem).
-        const fresh = projectsRef.current
-          .find((p) => p.id === id)
-          ?.scenes.find((s) => s.id === scene.id);
-        if (mode !== "all" && fresh?.imagePath) {
-          completed += 1;
-          setVisualBatch((b) => (b ? { ...b, completed, currentIndex: scene.index } : b));
-          continue;
+      try {
+        await callEnqueue({
+          data: { projectId: id, scenes: payload, aspectRatio: project.brief.aspectRatio },
+        });
+        // Scény hned označíme jako zařazené, ať UI nelže po obnovení stránky.
+        for (const item of payload) {
+          patchScene(id, item.sceneId, { visualStatus: "running", visualError: null });
         }
-
-        setVisualBatch((b) => (b ? { ...b, currentIndex: scene.index } : b));
-        const message = await generateVisual(id, scene.id);
-        completed += 1;
-        if (message) failed += 1;
-        setVisualBatch((b) => (b ? { ...b, completed, failed, currentIndex: scene.index } : b));
+      } catch (err) {
+        batchRef.current = false;
+        setError(errorMessage(err));
+        setVisualBatch(null);
+        return;
       }
 
+      // Fronta se posouvá na serveru; tady jen dokola žádáme o další scénu
+      // a hlídáme skutečný stav v databázi.
+      while (!cancelRef.current) {
+        const { data: jobs } = await supabase
+          .from("visual_jobs")
+          .select("scene_id, scene_index, status")
+          .eq("project_id", id)
+          .in("status", ["pending", "running", "done", "error"]);
+
+        const rows = (jobs ?? []) as { scene_id: string; scene_index: number; status: string }[];
+        const mine = rows.filter((r) => payload.some((p) => p.sceneId === r.scene_id));
+        const done = mine.filter((r) => r.status === "done").length;
+        const failed = mine.filter((r) => r.status === "error").length;
+        const current = mine.find((r) => r.status === "running");
+
+        setVisualBatch((b) =>
+          b
+            ? {
+                ...b,
+                completed: done + failed,
+                failed,
+                currentIndex: current?.scene_index ?? b.currentIndex,
+              }
+            : b,
+        );
+
+        const remaining = mine.filter((r) => r.status === "pending" || r.status === "running").length;
+        if (remaining === 0) break;
+
+        try {
+          await callProcessQueue({ data: undefined });
+        } catch {
+          // Server je zaneprázdněný nebo požadavek vypršel — frontu dotlačí
+          // naplánovaná serverová úloha, jen chvíli počkáme.
+          await new Promise((r) => setTimeout(r, 4000));
+        }
+
+        const refreshed = await fetchProjects().catch(() => null);
+        if (refreshed) setProjects(refreshed);
+      }
+
+      const refreshed = await fetchProjects().catch(() => null);
+      if (refreshed) setProjects(refreshed);
+
       batchRef.current = false;
-      setVisualBatch({
-        projectId: id,
-        running: false,
-        total: queue.length,
-        completed,
-        failed,
-        currentIndex: null,
-      });
+      setVisualBatch((b) => (b ? { ...b, running: false, currentIndex: null } : b));
     },
-    [generateVisual],
+    [callEnqueue, callProcessQueue, patchScene],
   );
+
+  useEffect(() => {
+    if (!resumeProjectId) return;
+    setResumeProjectId(null);
+    void generateVisualsBatch(resumeProjectId, "missing");
+  }, [generateVisualsBatch, resumeProjectId]);
 
   const cancelVisualBatch = useCallback(() => {
     cancelRef.current = true;
-  }, []);
+    const id = visualBatch?.projectId;
+    if (id) void callCancelJobs({ data: { projectId: id } }).catch(() => undefined);
+  }, [callCancelJobs, visualBatch]);
+
 
 
   /** Vygeneruje dabing jedné scény. Chyba jedné scény neovlivní ostatní. */
