@@ -85,6 +85,11 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const creep = useRef<ReturnType<typeof setInterval> | null>(null);
   const stepsRef = useRef<WorkflowStep[]>(steps);
   stepsRef.current = steps;
+  const projectsRef = useRef<VideoProject[]>(projects);
+  projectsRef.current = projects;
+  const [visualBatch, setVisualBatch] = useState<VisualBatchState | null>(null);
+  const batchRef = useRef(false);
+  const cancelRef = useRef(false);
 
   const callScript = useServerFn(generateScriptFn);
   const callScenes = useServerFn(generateScenesFn);
