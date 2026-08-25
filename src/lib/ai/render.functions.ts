@@ -406,6 +406,39 @@ async function resolveVideoUrl(supabase: unknown, job: JobRow): Promise<string |
   return job.output_url ?? null;
 }
 
+/**
+ * Doplní skutečné parametry u starších hotových renderů (uložených ještě bez
+ * ověření). Soubor se čte z úložiště, nic se negeneruje znovu.
+ */
+async function backfillFacts(supabase: any, job: JobRow): Promise<JobRow> {
+  if (job.status !== "done" || job.width !== null || !job.storage_path) return job;
+  try {
+    const url = await signedUrl(supabase as Client, RENDERS_BUCKET, job.storage_path);
+    const res = await fetch(url);
+    if (!res.ok) return job;
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    if (bytes.byteLength === 0 || bytes.byteLength > MAX_COPY_BYTES) return job;
+    const { facts } = validateRenderedMp4(bytes, null);
+    if (!facts.container) return job;
+    const { data: updated } = await supabase
+      .from("render_jobs")
+      .update({
+        width: facts.width,
+        height: facts.height,
+        video_codec: facts.videoCodec,
+        audio_codec: facts.audioCodec,
+        file_bytes: bytes.byteLength,
+        duration_seconds: facts.seconds ?? job.duration_seconds,
+      })
+      .eq("id", job.id)
+      .select(JOB_COLUMNS)
+      .single();
+    return (updated ?? job) as unknown as JobRow;
+  } catch {
+    return job;
+  }
+}
+
 const latestSchema = z.object({ projectId: z.string().min(1) });
 
 /** Poslední render úloha projektu — zdroj pravdy pro stav exportu. */
@@ -421,8 +454,9 @@ export const latestRenderFn = createServerFn({ method: "POST" })
       .order("created_at", { ascending: false })
       .limit(1);
     if (error) throw new Error(`Stav exportu se nepodařilo načíst: ${error.message}`);
-    const row = (rows ?? [])[0] as unknown as JobRow | undefined;
-    if (!row) return { job: null as RenderJobView | null };
+    const first = (rows ?? [])[0] as unknown as JobRow | undefined;
+    if (!first) return { job: null as RenderJobView | null };
+    const row = await backfillFacts(supabase, first);
     return { job: toView(row, await resolveVideoUrl(supabase, row)) };
   });
 
@@ -444,6 +478,6 @@ export const refreshRenderUrlFn = createServerFn({ method: "POST" })
       .maybeSingle();
     if (error) throw new Error(`Odkaz na video se nepodařilo obnovit: ${error.message}`);
     if (!row) throw new Error("Render úloha nebyla nalezena.");
-    const job = row as unknown as JobRow;
+    const job = await backfillFacts(supabase, row as unknown as JobRow);
     return { job: toView(job, await resolveVideoUrl(supabase, job)) };
   });
