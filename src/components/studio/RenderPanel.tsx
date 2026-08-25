@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { AlertTriangle, Check, Download, Loader2, Play, RefreshCw, Upload } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { latestRenderFn, refreshRenderUrlFn, renderStatusFn, startRenderFn, type RenderJobView } from "@/lib/ai/render.functions";
 import { formatSeconds } from "@/lib/studio/timeline";
 import type { VideoProject } from "@/lib/studio/types";
@@ -51,6 +52,21 @@ const STATUS_LABEL: Record<RenderJobView["status"], string> = {
   error: "Render selhal",
 };
 
+type MediaEventName = "loadedmetadata" | "canplay" | "error" | "stalled" | "waiting" | "abort";
+
+type PlaybackDiagnostic = {
+  event: MediaEventName | "čeká";
+  errorCode: number | null;
+  errorMessage: string | null;
+};
+
+const MEDIA_ERROR_LABEL: Record<number, string> = {
+  1: "MEDIA_ERR_ABORTED",
+  2: "MEDIA_ERR_NETWORK",
+  3: "MEDIA_ERR_DECODE",
+  4: "MEDIA_ERR_SRC_NOT_SUPPORTED",
+};
+
 export function RenderPanel({
   project,
   onStateChange,
@@ -66,7 +82,15 @@ export function RenderPanel({
   const [job, setJob] = useState<RenderJobView | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
+  const [httpStatus, setHttpStatus] = useState<number | null>(null);
+  const [mimeType, setMimeType] = useState<string | null>(null);
+  const [playback, setPlayback] = useState<PlaybackDiagnostic>({
+    event: "čeká",
+    errorCode: null,
+    errorMessage: null,
+  });
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const projectId = project.id;
 
   const clearTimer = () => {
@@ -128,6 +152,55 @@ export function RenderPanel({
       clearTimer();
     };
   }, [callLatest, poll, projectId]);
+
+  useEffect(() => {
+    if (!job?.videoUrl) return;
+    const controller = new AbortController();
+    void fetch(job.videoUrl, {
+      headers: { Range: "bytes=0-1023" },
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        setHttpStatus(response.status);
+        setMimeType(response.headers.get("content-type"));
+        await response.arrayBuffer();
+      })
+      .catch((fetchError) => {
+        if ((fetchError as Error).name !== "AbortError") setHttpStatus(0);
+      });
+    return () => controller.abort();
+  }, [job?.videoUrl]);
+
+  const recordMediaEvent = (event: MediaEventName) => {
+    const mediaError = videoRef.current?.error;
+    setPlayback({
+      event,
+      errorCode: mediaError?.code ?? null,
+      errorMessage: mediaError?.message || null,
+    });
+  };
+
+  const playVideo = async () => {
+    const video = videoRef.current;
+    if (!video || !job) return;
+    setError(null);
+    if (video.error) {
+      const { job: fresh } = (await callRefresh({ data: { jobId: job.id } })) as { job: RenderJobView };
+      setJob(fresh);
+      video.load();
+    }
+    try {
+      await video.play();
+      video.scrollIntoView({ behavior: "smooth", block: "center" });
+    } catch (playError) {
+      const mediaError = video.error;
+      setPlayback({
+        event: "error",
+        errorCode: mediaError?.code ?? null,
+        errorMessage: mediaError?.message || (playError instanceof Error ? playError.message : String(playError)),
+      });
+    }
+  };
 
   const start = async () => {
     setError(null);
@@ -219,14 +292,59 @@ export function RenderPanel({
 
         {ready && job.videoUrl && (
           <video
+            ref={videoRef}
             key={job.videoUrl}
-            src={job.videoUrl}
             controls
             playsInline
             preload="metadata"
-            onError={() => void refreshUrl(job.id)}
+            onLoadedMetadata={() => recordMediaEvent("loadedmetadata")}
+            onCanPlay={() => recordMediaEvent("canplay")}
+            onError={() => recordMediaEvent("error")}
+            onStalled={() => recordMediaEvent("stalled")}
+            onWaiting={() => recordMediaEvent("waiting")}
+            onAbort={() => recordMediaEvent("abort")}
             className="w-full rounded-xl border border-border bg-black"
-          />
+          >
+            <source src={job.videoUrl} type="video/mp4" />
+            Prohlížeč nepodporuje přehrávání MP4.
+          </video>
+        )}
+
+        {ready && (
+          <div className="space-y-2 rounded-xl border border-border bg-surface-2 p-3">
+            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+              MP4 diagnostika
+            </p>
+            <dl className="grid grid-cols-[6rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-xs">
+              <dt className="text-muted-foreground">Soubor</dt>
+              <dd className="break-all font-medium">{job.storagePath?.split("/").at(-1) ?? "neurčeno"}</dd>
+              <dt className="text-muted-foreground">Storage</dt>
+              <dd className="break-all font-medium">project-renders/{job.storagePath ?? "neurčeno"}</dd>
+              <dt className="text-muted-foreground">HTTP</dt>
+              <dd className="font-medium">{httpStatus === null ? "ověřuji…" : httpStatus === 0 ? "chyba sítě" : httpStatus}</dd>
+              <dt className="text-muted-foreground">MIME</dt>
+              <dd className="font-medium">{mimeType ?? "ověřuji…"}</dd>
+              <dt className="text-muted-foreground">Velikost</dt>
+              <dd className="font-medium">{job.fileBytes?.toLocaleString("cs-CZ") ?? "neurčeno"} B</dd>
+              <dt className="text-muted-foreground">Rozlišení</dt>
+              <dd className="font-medium">{job.width && job.height ? `${job.width}×${job.height}` : "neurčeno"}</dd>
+              <dt className="text-muted-foreground">Video</dt>
+              <dd className="font-medium">{codec(job.videoCodec)} — {job.videoCodec ? "OK" : "CHYBA"}</dd>
+              <dt className="text-muted-foreground">Audio</dt>
+              <dd className="font-medium">{codec(job.audioCodec)} — {job.audioCodec ? "OK" : "CHYBA"}</dd>
+              <dt className="text-muted-foreground">Délka</dt>
+              <dd className="font-medium">{job.durationSeconds ? formatSeconds(job.durationSeconds) : "neurčeno"}</dd>
+              <dt className="text-muted-foreground">URL</dt>
+              <dd className="break-all font-medium">{job.videoUrl ? "Podepsaná URL skutečného MP4" : "CHYBA"}</dd>
+              <dt className="text-muted-foreground">Přehrávač</dt>
+              <dd className="break-words font-medium">
+                {playback.event}
+                {playback.errorCode
+                  ? ` · ${MEDIA_ERROR_LABEL[playback.errorCode] ?? "MEDIA_ERROR"} (${playback.errorCode})${playback.errorMessage ? `: ${playback.errorMessage}` : ""}`
+                  : ""}
+              </dd>
+            </dl>
+          </div>
         )}
 
         {ready && (
@@ -266,13 +384,14 @@ export function RenderPanel({
         )}
 
         {ready && (
-          <button
+          <Button
+            variant="outline"
             onClick={() => void refreshUrl(job.id)}
-            className="flex items-center justify-center gap-2 rounded-xl border border-border bg-surface-2 py-2 text-xs font-medium"
+            className="w-full"
           >
             <RefreshCw className="size-3.5" />
             Obnovit odkaz na video
-          </button>
+          </Button>
         )}
 
       </div>
@@ -288,15 +407,14 @@ export function RenderPanel({
 
       {ready && job.videoUrl && (
         <div className="grid grid-cols-2 gap-3">
-          <a
-            href={job.videoUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="flex items-center justify-center gap-2 rounded-xl border border-border bg-surface py-3.5 text-sm font-medium"
+          <Button
+            variant="outline"
+            onClick={() => void playVideo()}
+            className="h-auto py-3.5"
           >
             <Play className="size-4" />
             Přehrát video
-          </a>
+          </Button>
           <a
             href={job.downloadUrl ?? job.videoUrl}
             download={`${project.title || "video"}.mp4`}
