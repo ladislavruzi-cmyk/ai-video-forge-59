@@ -133,7 +133,7 @@ export const WORKFLOW_BLUEPRINT: { id: string; title: string; description: strin
   { id: "scenar", title: "Vytvoření scénáře", description: "AI generuje kompletní komentář" },
   { id: "sceny", title: "Rozdělení scén", description: "AI rozpad scénáře na strukturované scény" },
   { id: "vizualy", title: "Vytvoření vizuálů", description: "Spusť v projektu → záložka Vizuály (AI obrázky scén)" },
-  { id: "dabing", title: "Generování dabingu", description: "Připraveno k napojení API", pending: true },
+  { id: "dabing", title: "Generování dabingu", description: "Spusť v projektu → záložka Dabing (AI hlas scén)" },
   { id: "sync", title: "Synchronizace obrazu a zvuku", description: "Připraveno k napojení API", pending: true },
   { id: "hudba", title: "Přidání hudby a efektů", description: "Připraveno k napojení API", pending: true },
   { id: "titulky", title: "Vytvoření titulků", description: "Připraveno k napojení API", pending: true },
