@@ -93,7 +93,7 @@ export function inspectMp4(bytes: Uint8Array): Mp4Facts {
       walk(bytes, from, to, (n2, f2, t2) => {
         if (n2 === "tkhd") {
           const version = bytes[f2]!;
-          const base = version === 1 ? f2 + 92 : f2 + 80;
+          const base = version === 1 ? f2 + 88 : f2 + 76;
           const w = u32(bytes, base) / 65536;
           const h = u32(bytes, base + 4) / 65536;
           if (w > 1 && h > 1) {
