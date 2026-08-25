@@ -59,6 +59,27 @@ export interface Scene {
   /** Délka vygenerovaného audia v sekundách. */
   audioSeconds?: number | null;
   audioError?: string | null;
+  /** Stav synchronizace obrazu a zvuku scény. */
+  syncStatus?: StepStatus;
+  syncError?: string | null;
+  /** Skutečná délka dabingu zjištěná ze souboru (s). */
+  audioDuration?: number | null;
+  /** Délka vizuálu přizpůsobená délce dabingu včetně přechodu (s). */
+  visualDuration?: number | null;
+  /** Pozice scény na časové ose (s). */
+  startTime?: number | null;
+  endTime?: number | null;
+  /** Délka přechodu do následující scény (s). */
+  transitionSeconds?: number | null;
+}
+
+/** Data časové osy připravená pro následný render. */
+export interface SyncTimeline {
+  syncedAt: string;
+  totalSeconds: number;
+  sceneCount: number;
+  syncedScenes: number;
+  failedScenes: number;
 }
 
 
@@ -82,6 +103,8 @@ export interface VideoProject {
   tracks: SoundTrack[];
   subtitlesEnabled: boolean;
   steps: WorkflowStep[];
+  /** Výsledek posledního běhu synchronizace obrazu a zvuku. */
+  timeline?: SyncTimeline | null;
 }
 
 export const LENGTH_OPTIONS: { value: VideoLength; label: string; minutes: number }[] = [
@@ -134,7 +157,7 @@ export const WORKFLOW_BLUEPRINT: { id: string; title: string; description: strin
   { id: "sceny", title: "Rozdělení scén", description: "AI rozpad scénáře na strukturované scény" },
   { id: "vizualy", title: "Vytvoření vizuálů", description: "Spusť v projektu → záložka Vizuály (AI obrázky scén)" },
   { id: "dabing", title: "Generování dabingu", description: "Spusť v projektu → záložka Dabing (AI hlas scén)" },
-  { id: "sync", title: "Synchronizace obrazu a zvuku", description: "Připraveno k napojení API", pending: true },
+  { id: "sync", title: "Synchronizace obrazu a zvuku", description: "Spusť v projektu → záložka Synchronizace (časová osa scén)" },
   { id: "hudba", title: "Přidání hudby a efektů", description: "Připraveno k napojení API", pending: true },
   { id: "titulky", title: "Vytvoření titulků", description: "Připraveno k napojení API", pending: true },
   { id: "render", title: "Renderování videa", description: "Připraveno k napojení API", pending: true },
