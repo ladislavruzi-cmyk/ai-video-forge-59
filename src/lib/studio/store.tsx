@@ -167,18 +167,12 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         setProjects((cur) => [project, ...cur]);
         setLastProjectId(project.id);
 
-        // Zbývající kroky pipeline zatím simulujeme (API se doplní později).
-        for (const id of ["vizualy", "dabing", "sync", "hudba", "titulky", "render", "export"]) {
-          current = id;
-          beginStep(id);
-          await new Promise((r) => setTimeout(r, 500));
-          finishStep(id);
-        }
+        // Kroky 4–10 zatím nejsou napojeny na AI API — ponecháme je ve stavu ČEKÁ.
         const snapshot = stepsRef.current.map((st) => ({ ...st }));
         const finished: VideoProject = {
           ...project,
           steps: snapshot,
-          state: "Připraveno k exportu",
+          state: "Rozpracováno",
         };
         await saveProject(finished);
         setProjects((list) => list.map((p) => (p.id === finished.id ? finished : p)));

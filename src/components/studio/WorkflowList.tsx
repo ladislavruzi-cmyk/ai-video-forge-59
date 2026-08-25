@@ -54,7 +54,7 @@ export function WorkflowList({ steps }: { steps: WorkflowStep[] }) {
               <div className="flex items-baseline justify-between gap-2">
                 <p className="truncate text-sm font-medium">{step.title}</p>
                 <span className={`shrink-0 text-[10px] font-bold uppercase tracking-wider ${STATUS_TEXT[step.status]}`}>
-                  {STEP_STATUS_LABEL[step.status]}
+                  {step.pending && step.status === "waiting" ? "Připraveno k napojení API" : STEP_STATUS_LABEL[step.status]}
                 </span>
               </div>
               <p className="truncate text-[11px] text-muted-foreground">{step.description}</p>
