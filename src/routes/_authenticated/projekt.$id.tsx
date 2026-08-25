@@ -566,7 +566,10 @@ function ProjectPage() {
                         <p className="text-[11px] text-status-error">{scene.visualError}</p>
                       )}
                       <button
-                        disabled={busy !== null}
+                        disabled={
+                          busy !== null ||
+                          (visualBatch?.projectId === project.id && visualBatch.running)
+                        }
                         onClick={async () => {
                           setNote(null);
                           setErr(null);
