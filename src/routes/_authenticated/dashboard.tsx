@@ -4,7 +4,7 @@ import { AppShell } from "@/components/studio/AppShell";
 import { useStudio } from "@/lib/studio/store";
 import { formatDuration } from "@/lib/studio/types";
 
-export const Route = createFileRoute("/dashboard")({
+export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({
     meta: [
       { title: "Dashboard — AI YouTube Studio" },

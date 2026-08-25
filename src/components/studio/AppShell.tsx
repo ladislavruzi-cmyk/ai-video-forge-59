@@ -7,9 +7,12 @@ import {
   Sparkles,
   LayoutTemplate,
   Mic,
+  LogOut,
   type LucideIcon,
 } from "lucide-react";
 import type { ReactNode } from "react";
+
+import { useAuth } from "@/lib/auth/useAuth";
 
 interface NavItem {
   to: string;
@@ -31,6 +34,8 @@ const NAV: NavItem[] = [
 const MOBILE_NAV = NAV.filter((n) => ["/", "/projekty", "/hlasy", "/nastaveni"].includes(n.to));
 
 export function AppShell({ title, children }: { title: string; children: ReactNode }) {
+  const { email, signOut } = useAuth();
+
   return (
     <div className="min-h-screen bg-background text-foreground lg:flex">
       <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-border bg-surface-2/60 px-3 py-5 lg:flex">
@@ -57,9 +62,20 @@ export function AppShell({ title, children }: { title: string; children: ReactNo
             </Link>
           ))}
         </nav>
-        <p className="mt-auto px-3 text-[10px] leading-relaxed text-muted-foreground">
-          Scénář a scény generuje AI. Dabing, vizuály a render se doplní později.
-        </p>
+        <div className="mt-auto space-y-3 px-3">
+          <p className="text-[10px] leading-relaxed text-muted-foreground">
+            Scénář a scény generuje AI. Dabing, vizuály a render se doplní později.
+          </p>
+          {email && <p className="truncate text-[11px] font-medium text-foreground">{email}</p>}
+          <button
+            type="button"
+            onClick={() => void signOut()}
+            className="flex w-full items-center gap-2 rounded-lg border border-border px-3 py-2 text-xs font-semibold text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
+          >
+            <LogOut className="size-3.5" />
+            Odhlásit se
+          </button>
+        </div>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col pb-20 lg:pb-0">
@@ -73,10 +89,15 @@ export function AppShell({ title, children }: { title: string; children: ReactNo
               {title}
             </p>
           </div>
-          <span className="flex shrink-0 items-center gap-2 rounded-full border border-border bg-surface px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-cyan">
-            <span className="size-1.5 rounded-full bg-cyan" />
-            Simulace
-          </span>
+          <button
+            type="button"
+            onClick={() => void signOut()}
+            aria-label="Odhlásit se"
+            className="flex shrink-0 items-center gap-2 rounded-full border border-border bg-surface px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground transition-colors hover:text-foreground lg:hidden"
+          >
+            <LogOut className="size-3.5" />
+            Odhlásit
+          </button>
         </header>
 
         <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 lg:px-8">{children}</main>

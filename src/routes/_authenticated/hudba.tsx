@@ -3,7 +3,7 @@ import { Music4 } from "lucide-react";
 import { AppShell } from "@/components/studio/AppShell";
 import { MUSIC_OPTIONS } from "@/lib/studio/types";
 
-export const Route = createFileRoute("/hudba")({
+export const Route = createFileRoute("/_authenticated/hudba")({
   head: () => ({
     meta: [
       { title: "Hudba a zvuky — AI YouTube Studio" },

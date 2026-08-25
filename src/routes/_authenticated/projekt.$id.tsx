@@ -14,7 +14,7 @@ import { useStudio } from "@/lib/studio/store";
 import { STEP_STATUS_LABEL, countWords, formatDuration, type Scene } from "@/lib/studio/types";
 import scenePreview from "@/assets/scene-preview.jpg";
 
-export const Route = createFileRoute("/projekt/$id")({
+export const Route = createFileRoute("/_authenticated/projekt/$id")({
   head: () => ({
     meta: [
       { title: "Projekt videa — AI YouTube Studio" },
