@@ -60,6 +60,17 @@ type PlaybackDiagnostic = {
   errorMessage: string | null;
 };
 
+function safeUrl(value: string | null): string {
+  if (!value) return "CHYBA";
+  try {
+    const url = new URL(value);
+    if (url.searchParams.has("token")) url.searchParams.set("token", "PODEPSANÝ_TOKEN");
+    return url.toString();
+  } catch {
+    return "Neplatná URL";
+  }
+}
+
 const MEDIA_ERROR_LABEL: Record<number, string> = {
   1: "MEDIA_ERR_ABORTED",
   2: "MEDIA_ERR_NETWORK",
@@ -84,6 +95,7 @@ export function RenderPanel({
   const [starting, setStarting] = useState(false);
   const [httpStatus, setHttpStatus] = useState<number | null>(null);
   const [mimeType, setMimeType] = useState<string | null>(null);
+  const [codecSupport, setCodecSupport] = useState<string>("ověřuji…");
   const [playback, setPlayback] = useState<PlaybackDiagnostic>({
     event: "čeká",
     errorCode: null,
@@ -170,6 +182,12 @@ export function RenderPanel({
       });
     return () => controller.abort();
   }, [job?.videoUrl]);
+
+  useEffect(() => {
+    const probe = document.createElement("video");
+    const result = probe.canPlayType('video/mp4; codecs="avc1.640015, mp4a.40.2"');
+    setCodecSupport(result || "nepodporováno");
+  }, []);
 
   const recordMediaEvent = (event: MediaEventName) => {
     const mediaError = videoRef.current?.error;
@@ -335,7 +353,9 @@ export function RenderPanel({
               <dt className="text-muted-foreground">Délka</dt>
               <dd className="font-medium">{job.durationSeconds ? formatSeconds(job.durationSeconds) : "neurčeno"}</dd>
               <dt className="text-muted-foreground">URL</dt>
-              <dd className="break-all font-medium">{job.videoUrl ? "Podepsaná URL skutečného MP4" : "CHYBA"}</dd>
+              <dd className="break-all font-medium">{safeUrl(job.videoUrl)}</dd>
+              <dt className="text-muted-foreground">Prohlížeč</dt>
+              <dd className="font-medium">H.264 + AAC: {codecSupport}</dd>
               <dt className="text-muted-foreground">Přehrávač</dt>
               <dd className="break-words font-medium">
                 {playback.event}
