@@ -27,6 +27,8 @@ export interface RenderJobView {
   progress: number | null;
   /** Odkaz na hotové MP4 — z vlastního úložiště, jinak z CDN render služby. */
   videoUrl: string | null;
+  /** Stejný soubor s vynuceným stažením (Content-Disposition: attachment). */
+  downloadUrl: string | null;
   storagePath: string | null;
   durationSeconds: number | null;
   sceneCount: number | null;
