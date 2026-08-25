@@ -51,8 +51,17 @@ const TABS = [
 
 function ProjectPage() {
   const { id } = Route.useParams();
-  const { getProject, updateProject, regenerateScript, regenerateScene, generateVisual, generateVoice } =
-    useStudio();
+  const {
+    getProject,
+    updateProject,
+    regenerateScript,
+    regenerateScene,
+    generateVisual,
+    generateVoice,
+    visualBatch,
+    generateVisualsBatch,
+    cancelVisualBatch,
+  } = useStudio();
   const project = getProject(id);
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("scenar");
   const [note, setNote] = useState<string | null>(null);
@@ -428,33 +437,104 @@ function ProjectPage() {
 
         {tab === "vizualy" && (
           <section className="space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Vizuály</h3>
-              <button
-                disabled={busy !== null}
-                onClick={async () => {
-                  setNote(null);
-                  setErr(null);
-                  let failed = 0;
-                  for (const scene of project.scenes) {
-                    setBusy(`vis-${scene.id}`);
-                    const message = await generateVisual(project.id, scene.id);
-                    if (message) failed += 1;
-                  }
-                  setBusy(null);
-                  if (failed > 0) setErr(`${failed} scén(y) se nepodařilo vygenerovat. Zkus je znovu jednotlivě.`);
-                  else setNote("Vizuály všech scén byly vygenerovány.");
-                }}
-                className="flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-brand-foreground disabled:opacity-60"
-              >
-                <ImagePlus className="size-4" />
-                Vygenerovat všechny vizuály
-              </button>
-            </div>
+            {(() => {
+              const batch =
+                visualBatch && visualBatch.projectId === project.id ? visualBatch : null;
+              const batchRunning = batch?.running === true;
+              const missing = project.scenes.filter((s) => !s.imagePath).length;
+              const errors = project.scenes.filter(
+                (s) => (s.visualStatus ?? "waiting") === "error" || !s.imagePath,
+              ).length;
+              const percent =
+                batch && batch.total > 0 ? Math.round((batch.completed / batch.total) * 100) : 0;
+              const lock = busy !== null || batchRunning;
+              return (
+                <>
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground">
+                      Vizuály
+                    </h3>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        disabled={lock}
+                        onClick={() => {
+                          setNote(null);
+                          setErr(null);
+                          void generateVisualsBatch(project.id, "all");
+                        }}
+                        className="flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-brand-foreground disabled:opacity-60"
+                      >
+                        <ImagePlus className="size-4" />
+                        Vygenerovat všechny vizuály
+                      </button>
+                      <button
+                        disabled={lock || missing === 0}
+                        onClick={() => {
+                          setNote(null);
+                          setErr(null);
+                          void generateVisualsBatch(project.id, "missing");
+                        }}
+                        className="rounded-xl border border-border px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-foreground disabled:opacity-40"
+                      >
+                        Pokračovat v generování ({missing})
+                      </button>
+                      <button
+                        disabled={lock || errors === 0}
+                        onClick={() => {
+                          setNote(null);
+                          setErr(null);
+                          void generateVisualsBatch(project.id, "errors");
+                        }}
+                        className="rounded-xl border border-border px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-foreground disabled:opacity-40"
+                      >
+                        Znovu vygenerovat pouze chybné
+                      </button>
+                      {batchRunning && (
+                        <button
+                          onClick={cancelVisualBatch}
+                          className="rounded-xl border border-border px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-status-error"
+                        >
+                          Zastavit
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {batch && batch.total > 0 && (
+                    <div className="rounded-xl border border-border bg-surface p-4">
+                      <div className="flex items-center justify-between gap-3 text-xs font-bold uppercase tracking-wider">
+                        <span className={batchRunning ? "text-cyan" : "text-muted-foreground"}>
+                          {batchRunning
+                            ? `Generuji vizuál ${Math.min(batch.completed + 1, batch.total)} z ${batch.total}${
+                                batch.currentIndex ? ` — scéna ${batch.currentIndex}` : ""
+                              }`
+                            : `Dokončeno ${batch.completed} z ${batch.total}${
+                                batch.failed > 0 ? ` — chyb: ${batch.failed}` : ""
+                              }`}
+                        </span>
+                        <span className="text-muted-foreground">{percent} %</span>
+                      </div>
+                      <div className="mt-2 h-2 overflow-hidden rounded-full bg-surface-2">
+                        <div
+                          className="h-full rounded-full bg-brand transition-all"
+                          style={{ width: `${percent}%` }}
+                        />
+                      </div>
+                      {!batchRunning && batch.failed > 0 && (
+                        <p className="mt-2 text-[11px] text-status-error">
+                          Některé scény skončily chybou. Použij „Znovu vygenerovat pouze chybné“.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </>
+              );
+            })()}
             <div className="grid gap-4 sm:grid-cols-2">
               {project.scenes.map((scene) => {
                 const status = scene.visualStatus ?? "waiting";
                 const generating = busy === `vis-${scene.id}` || status === "running";
+
                 return (
                   <figure key={scene.id} className="overflow-hidden rounded-xl border border-border bg-surface">
                     <SceneImage
@@ -486,7 +566,10 @@ function ProjectPage() {
                         <p className="text-[11px] text-status-error">{scene.visualError}</p>
                       )}
                       <button
-                        disabled={busy !== null}
+                        disabled={
+                          busy !== null ||
+                          (visualBatch?.projectId === project.id && visualBatch.running)
+                        }
                         onClick={async () => {
                           setNote(null);
                           setErr(null);
