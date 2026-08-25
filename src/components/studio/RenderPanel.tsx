@@ -43,6 +43,7 @@ export function RenderPanel({
   const callStart = useServerFn(startRenderFn);
   const callStatus = useServerFn(renderStatusFn);
   const callLatest = useServerFn(latestRenderFn);
+  const callRefresh = useServerFn(refreshRenderUrlFn);
 
   const [job, setJob] = useState<RenderJobView | null>(null);
   const [error, setError] = useState<string | null>(null);
