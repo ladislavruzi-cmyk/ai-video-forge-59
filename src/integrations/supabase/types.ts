@@ -47,6 +47,60 @@ export type Database = {
         }
         Relationships: []
       }
+      visual_jobs: {
+        Row: {
+          aspect_ratio: string
+          attempts: number
+          created_at: string
+          error: string | null
+          finished_at: string | null
+          id: string
+          image_path: string | null
+          project_id: string
+          prompt: string
+          scene_id: string
+          scene_index: number
+          started_at: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          aspect_ratio?: string
+          attempts?: number
+          created_at?: string
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          image_path?: string | null
+          project_id: string
+          prompt: string
+          scene_id: string
+          scene_index?: number
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          aspect_ratio?: string
+          attempts?: number
+          created_at?: string
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          image_path?: string | null
+          project_id?: string
+          prompt?: string
+          scene_id?: string
+          scene_index?: number
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
