@@ -25,7 +25,9 @@ import {
   type WorkflowStep,
 } from "./types";
 import { generateScenesFn, generateScriptFn, regenerateSceneFn } from "@/lib/ai/pipeline.functions";
+import { generateSceneVisualFn } from "@/lib/ai/visuals.functions";
 import { fetchProjects, removeProject, saveProject } from "./projects.repo";
+
 
 function errorMessage(err: unknown): string {
   const raw = err instanceof Error ? err.message : String(err);
