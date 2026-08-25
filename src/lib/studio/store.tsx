@@ -54,6 +54,7 @@ interface StudioContextValue {
   regenerateScript: (id: string) => Promise<string | null>;
   regenerateScene: (id: string, sceneId: string) => Promise<string | null>;
   generateVisual: (id: string, sceneId: string) => Promise<string | null>;
+  generateVoice: (id: string, sceneId: string) => Promise<string | null>;
 }
 
 
