@@ -6,14 +6,42 @@ import type { VideoProject } from "./types";
  * Row Level Security zajišťuje, že uživatel vidí a mění pouze své projekty.
  */
 
+const STALE_VISUAL_MSG =
+  "Generování vizuálu bylo přerušeno (zavření nebo obnovení stránky během běhu). Spusť generování této scény znovu.";
+const STALE_AUDIO_MSG =
+  "Generování dabingu bylo přerušeno (zavření nebo obnovení stránky během běhu). Spusť generování této scény znovu.";
+
+/**
+ * Stav "running" žije jen v běžící kartě prohlížeče. Pokud se stránka obnoví
+ * nebo zavře, požadavek se zruší a v databázi zůstane zaseknuté "Generuje se".
+ * Při načtení proto takové scény označíme jako Chybu — hotové scény necháme být.
+ */
+function healStaleScenes(project: VideoProject): VideoProject {
+  return {
+    ...project,
+    scenes: (project.scenes ?? []).map((s) => ({
+      ...s,
+      ...(s.visualStatus === "running" && !s.imagePath
+        ? { visualStatus: "error" as const, visualError: s.visualError ?? STALE_VISUAL_MSG }
+        : {}),
+      ...(s.audioStatus === "running" && !s.audioPath
+        ? { audioStatus: "error" as const, audioError: s.audioError ?? STALE_AUDIO_MSG }
+        : {}),
+    })),
+  };
+}
+
 export async function fetchProjects(): Promise<VideoProject[]> {
   const { data, error } = await supabase
     .from("projects")
     .select("id, data")
     .order("created_at", { ascending: false });
   if (error) throw error;
-  return (data ?? []).map((row) => ({ ...(row.data as unknown as VideoProject), id: row.id }));
+  return (data ?? []).map((row) =>
+    healStaleScenes({ ...(row.data as unknown as VideoProject), id: row.id }),
+  );
 }
+
 
 export async function saveProject(project: VideoProject): Promise<void> {
   const { data: userData, error: userError } = await supabase.auth.getUser();
