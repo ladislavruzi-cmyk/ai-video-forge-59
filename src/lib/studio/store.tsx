@@ -25,8 +25,7 @@ import {
   type WorkflowStep,
 } from "./types";
 import { generateScenesFn, generateScriptFn, regenerateSceneFn } from "@/lib/ai/pipeline.functions";
-
-const STORAGE_KEY = "ai-yt-studio-projects";
+import { fetchProjects, removeProject, saveProject } from "./projects.repo";
 
 function errorMessage(err: unknown): string {
   const raw = err instanceof Error ? err.message : String(err);
@@ -63,27 +62,19 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [activeBrief, setActiveBrief] = useState<VideoBrief | null>(null);
   const [lastProjectId, setLastProjectId] = useState<string | null>(null);
   const creep = useRef<ReturnType<typeof setInterval> | null>(null);
+  const stepsRef = useRef<WorkflowStep[]>(steps);
+  stepsRef.current = steps;
 
   const callScript = useServerFn(generateScriptFn);
   const callScenes = useServerFn(generateScenesFn);
   const callScene = useServerFn(regenerateSceneFn);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) setProjects(JSON.parse(raw) as VideoProject[]);
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
-  const persist = useCallback((next: VideoProject[]) => {
-    setProjects(next);
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-    } catch {
-      /* ignore */
-    }
+    void fetchProjects()
+      .then(setProjects)
+      .catch(() => {
+        /* nepřihlášený nebo offline — gate routy uživatele přesměruje */
+      });
   }, []);
 
   const stopCreep = useCallback(() => {
@@ -172,15 +163,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
           steps: [],
         };
 
-        setProjects((cur) => {
-          const merged = [project, ...cur];
-          try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
-          } catch {
-            /* ignore */
-          }
-          return merged;
-        });
+        await saveProject(project);
+        setProjects((cur) => [project, ...cur]);
         setLastProjectId(project.id);
 
         // Zbývající kroky pipeline zatím simulujeme (API se doplní později).
@@ -190,23 +174,14 @@ export function StudioProvider({ children }: { children: ReactNode }) {
           await new Promise((r) => setTimeout(r, 500));
           finishStep(id);
         }
-        setSteps((cur) => {
-          const snapshot = cur.map((st) => ({ ...st }));
-          setProjects((list) => {
-            const next = list.map((p) =>
-              p.id === project.id
-                ? { ...p, steps: snapshot, state: "Připraveno k exportu" as const }
-                : p,
-            );
-            try {
-              localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-            } catch {
-              /* ignore */
-            }
-            return next;
-          });
-          return cur;
-        });
+        const snapshot = stepsRef.current.map((st) => ({ ...st }));
+        const finished: VideoProject = {
+          ...project,
+          steps: snapshot,
+          state: "Připraveno k exportu",
+        };
+        await saveProject(finished);
+        setProjects((list) => list.map((p) => (p.id === finished.id ? finished : p)));
       } catch (err) {
         failStep(current);
         setError(errorMessage(err));
@@ -244,11 +219,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     (id: string, patch: Partial<VideoProject>) => {
       setProjects((cur) => {
         const next = cur.map((p) => (p.id === id ? { ...p, ...patch } : p));
-        try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-        } catch {
-          /* ignore */
-        }
+        const updated = next.find((p) => p.id === id);
+        if (updated) void saveProject(updated).catch(() => undefined);
         return next;
       });
     },
@@ -327,7 +299,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       retryFailedStep,
       getProject: (id) => projects.find((p) => p.id === id),
       updateProject,
-      deleteProject: (id) => persist(projects.filter((p) => p.id !== id)),
+      deleteProject: (id) => {
+        setProjects((cur) => cur.filter((p) => p.id !== id));
+        void removeProject(id).catch(() => undefined);
+      },
       regenerateScript,
       regenerateScene,
     }),
