@@ -225,6 +225,51 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  /** Bezpečná aktualizace jedné scény — pracuje vždy s nejnovějším stavem. */
+  const patchScene = useCallback((id: string, sceneId: string, patch: Partial<Scene>) => {
+    setProjects((cur) => {
+      const next = cur.map((p) =>
+        p.id === id
+          ? { ...p, scenes: p.scenes.map((s) => (s.id === sceneId ? { ...s, ...patch } : s)) }
+          : p,
+      );
+      const updated = next.find((p) => p.id === id);
+      if (updated) void saveProject(updated).catch(() => undefined);
+      return next;
+    });
+  }, []);
+
+  /** Vygeneruje vizuál jedné scény. Chyba jedné scény neovlivní ostatní. */
+  const generateVisual = useCallback(
+    async (id: string, sceneId: string): Promise<string | null> => {
+      const project = projects.find((p) => p.id === id);
+      const target = project?.scenes.find((s) => s.id === sceneId);
+      if (!project || !target) return "Scéna nenalezena.";
+      const prompt = target.visualPrompt.trim();
+      if (prompt.length < 3) return "Scéna nemá vizuální prompt. Nejdřív ji regeneruj nebo prompt doplň.";
+
+      patchScene(id, sceneId, { visualStatus: "running", visualError: null });
+      try {
+        const { path } = (await callVisual({
+          data: {
+            projectId: project.id,
+            sceneId,
+            prompt,
+            aspectRatio: project.brief.aspectRatio,
+          },
+        })) as { path: string };
+        patchScene(id, sceneId, { visualStatus: "done", imagePath: path, visualError: null });
+        return null;
+      } catch (err) {
+        const message = errorMessage(err);
+        patchScene(id, sceneId, { visualStatus: "error", visualError: message });
+        return message;
+      }
+    },
+    [callVisual, patchScene, projects],
+  );
+
+
   const regenerateScript = useCallback(
     async (id: string): Promise<string | null> => {
       const project = projects.find((p) => p.id === id);
