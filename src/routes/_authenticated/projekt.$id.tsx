@@ -83,6 +83,9 @@ function ProjectPage() {
       scenes: project.scenes.map((s) => (s.id === sceneId ? { ...s, ...patch } : s)),
     });
 
+  const coverPath = project.scenes.find((s) => s.imagePath)?.imagePath ?? null;
+
+
   return (
     <AppShell title="Projekt videa">
       <div className="space-y-8">
