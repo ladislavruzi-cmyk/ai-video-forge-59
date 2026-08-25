@@ -49,10 +49,13 @@ export type Database = {
       }
       render_jobs: {
         Row: {
+          audio_codec: string | null
           created_at: string
           duration_seconds: number | null
           error: string | null
+          file_bytes: number | null
           finished_at: string | null
+          height: number | null
           id: string
           output_url: string | null
           progress: number | null
@@ -65,12 +68,17 @@ export type Database = {
           storage_path: string | null
           updated_at: string
           user_id: string
+          video_codec: string | null
+          width: number | null
         }
         Insert: {
+          audio_codec?: string | null
           created_at?: string
           duration_seconds?: number | null
           error?: string | null
+          file_bytes?: number | null
           finished_at?: string | null
+          height?: number | null
           id?: string
           output_url?: string | null
           progress?: number | null
@@ -83,12 +91,17 @@ export type Database = {
           storage_path?: string | null
           updated_at?: string
           user_id: string
+          video_codec?: string | null
+          width?: number | null
         }
         Update: {
+          audio_codec?: string | null
           created_at?: string
           duration_seconds?: number | null
           error?: string | null
+          file_bytes?: number | null
           finished_at?: string | null
+          height?: number | null
           id?: string
           output_url?: string | null
           progress?: number | null
@@ -101,6 +114,8 @@ export type Database = {
           storage_path?: string | null
           updated_at?: string
           user_id?: string
+          video_codec?: string | null
+          width?: number | null
         }
         Relationships: []
       }
