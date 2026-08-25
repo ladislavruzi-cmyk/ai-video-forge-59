@@ -289,6 +289,82 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     [callVisual, patchScene, projects],
   );
 
+  /**
+   * Hromadné generování vizuálů: scény se zpracovávají POSTUPNĚ, jedna po druhé.
+   * Běží mimo React komponentu (v providerovi), takže přepnutí záložky nebo
+   * odchod z detailu projektu proces nezruší. Každá scéna se hned po dokončení
+   * ukládá do databáze, takže po obnovení stránky je stav známý a hotové scény
+   * se už nikdy negenerují znovu.
+   */
+  const generateVisualsBatch = useCallback(
+    async (id: string, mode: VisualBatchMode): Promise<void> => {
+      if (batchRef.current) return;
+      const project = projectsRef.current.find((p) => p.id === id);
+      if (!project) return;
+
+      const queue = project.scenes.filter((s) => {
+        if (mode === "all") return true;
+        if (mode === "errors") return (s.visualStatus ?? "waiting") === "error" || !s.imagePath;
+        // "missing" — pokračovat pouze u scén bez uloženého vizuálu
+        return !s.imagePath;
+      });
+
+      if (queue.length === 0) {
+        setVisualBatch({ projectId: id, running: false, total: 0, completed: 0, failed: 0, currentIndex: null });
+        return;
+      }
+
+      batchRef.current = true;
+      cancelRef.current = false;
+      setVisualBatch({
+        projectId: id,
+        running: true,
+        total: queue.length,
+        completed: 0,
+        failed: 0,
+        currentIndex: queue[0]?.index ?? null,
+      });
+
+      let completed = 0;
+      let failed = 0;
+
+      for (const scene of queue) {
+        if (cancelRef.current) break;
+        // Scéna mohla být mezitím hotová (např. jednotlivým tlačítkem).
+        const fresh = projectsRef.current
+          .find((p) => p.id === id)
+          ?.scenes.find((s) => s.id === scene.id);
+        if (mode !== "all" && fresh?.imagePath) {
+          completed += 1;
+          setVisualBatch((b) => (b ? { ...b, completed, currentIndex: scene.index } : b));
+          continue;
+        }
+
+        setVisualBatch((b) => (b ? { ...b, currentIndex: scene.index } : b));
+        const message = await generateVisual(id, scene.id);
+        completed += 1;
+        if (message) failed += 1;
+        setVisualBatch((b) => (b ? { ...b, completed, failed, currentIndex: scene.index } : b));
+      }
+
+      batchRef.current = false;
+      setVisualBatch({
+        projectId: id,
+        running: false,
+        total: queue.length,
+        completed,
+        failed,
+        currentIndex: null,
+      });
+    },
+    [generateVisual],
+  );
+
+  const cancelVisualBatch = useCallback(() => {
+    cancelRef.current = true;
+  }, []);
+
+
   /** Vygeneruje dabing jedné scény. Chyba jedné scény neovlivní ostatní. */
   const generateVoice = useCallback(
     async (id: string, sceneId: string): Promise<string | null> => {
