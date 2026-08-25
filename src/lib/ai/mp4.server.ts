@@ -101,27 +101,51 @@ export function inspectMp4(bytes: Uint8Array): Mp4Facts {
       }
     }
     if (name === "trak") {
+      let kind: "vide" | "soun" | null = null;
+      let format: string | null = null;
+      let w = 0;
+      let h = 0;
       walk(bytes, from, to, (n2, f2, t2) => {
         if (n2 === "tkhd") {
           const version = bytes[f2]!;
           const base = version === 1 ? f2 + 88 : f2 + 76;
-          const w = u32(bytes, base) / 65536;
-          const h = u32(bytes, base + 4) / 65536;
-          if (w > 1 && h > 1) {
-            facts.width = Math.round(w);
-            facts.height = Math.round(h);
-          }
+          w = u32(bytes, base) / 65536;
+          h = u32(bytes, base + 4) / 65536;
         }
         if (n2 === "mdia") {
-          walk(bytes, f2, t2, (n3, f3) => {
+          walk(bytes, f2, t2, (n3, f3, t3) => {
             if (n3 === "hdlr") {
               const handler = type(bytes, f3 + 8);
-              if (handler === "vide") facts.hasVideo = true;
-              if (handler === "soun") facts.hasAudio = true;
+              if (handler === "vide") kind = "vide";
+              if (handler === "soun") kind = "soun";
+            }
+            if (n3 === "minf") {
+              walk(bytes, f3, t3, (n4, f4, t4) => {
+                if (n4 !== "stbl") return;
+                walk(bytes, f4, t4, (n5, f5) => {
+                  // stsd: 4 B verze/flags + 4 B počet položek, pak sample entry (4 B size + 4 B formát)
+                  if (n5 === "stsd" && !format) format = type(bytes, f5 + 12);
+                });
+              });
             }
           });
         }
       });
+      if (kind === "vide") {
+        facts.hasVideo = true;
+        if (format) facts.videoCodec = format;
+        if (w > 1 && h > 1) {
+          facts.width = Math.round(w);
+          facts.height = Math.round(h);
+        }
+      }
+      if (kind === "soun") {
+        facts.hasAudio = true;
+        if (format) facts.audioCodec = format;
+      }
+    }
+  });
+
     }
   });
 
