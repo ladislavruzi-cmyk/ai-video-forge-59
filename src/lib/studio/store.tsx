@@ -25,7 +25,9 @@ import {
   type WorkflowStep,
 } from "./types";
 import { generateScenesFn, generateScriptFn, regenerateSceneFn } from "@/lib/ai/pipeline.functions";
+import { generateSceneVisualFn } from "@/lib/ai/visuals.functions";
 import { fetchProjects, removeProject, saveProject } from "./projects.repo";
+
 
 function errorMessage(err: unknown): string {
   const raw = err instanceof Error ? err.message : String(err);
@@ -50,7 +52,9 @@ interface StudioContextValue {
   deleteProject: (id: string) => void;
   regenerateScript: (id: string) => Promise<string | null>;
   regenerateScene: (id: string, sceneId: string) => Promise<string | null>;
+  generateVisual: (id: string, sceneId: string) => Promise<string | null>;
 }
+
 
 const StudioContext = createContext<StudioContextValue | null>(null);
 
@@ -68,6 +72,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const callScript = useServerFn(generateScriptFn);
   const callScenes = useServerFn(generateScenesFn);
   const callScene = useServerFn(regenerateSceneFn);
+  const callVisual = useServerFn(generateSceneVisualFn);
+
 
   useEffect(() => {
     void fetchProjects()
@@ -221,6 +227,51 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  /** Bezpečná aktualizace jedné scény — pracuje vždy s nejnovějším stavem. */
+  const patchScene = useCallback((id: string, sceneId: string, patch: Partial<Scene>) => {
+    setProjects((cur) => {
+      const next = cur.map((p) =>
+        p.id === id
+          ? { ...p, scenes: p.scenes.map((s) => (s.id === sceneId ? { ...s, ...patch } : s)) }
+          : p,
+      );
+      const updated = next.find((p) => p.id === id);
+      if (updated) void saveProject(updated).catch(() => undefined);
+      return next;
+    });
+  }, []);
+
+  /** Vygeneruje vizuál jedné scény. Chyba jedné scény neovlivní ostatní. */
+  const generateVisual = useCallback(
+    async (id: string, sceneId: string): Promise<string | null> => {
+      const project = projects.find((p) => p.id === id);
+      const target = project?.scenes.find((s) => s.id === sceneId);
+      if (!project || !target) return "Scéna nenalezena.";
+      const prompt = target.visualPrompt.trim();
+      if (prompt.length < 3) return "Scéna nemá vizuální prompt. Nejdřív ji regeneruj nebo prompt doplň.";
+
+      patchScene(id, sceneId, { visualStatus: "running", visualError: null });
+      try {
+        const { path } = (await callVisual({
+          data: {
+            projectId: project.id,
+            sceneId,
+            prompt,
+            aspectRatio: project.brief.aspectRatio,
+          },
+        })) as { path: string };
+        patchScene(id, sceneId, { visualStatus: "done", imagePath: path, visualError: null });
+        return null;
+      } catch (err) {
+        const message = errorMessage(err);
+        patchScene(id, sceneId, { visualStatus: "error", visualError: message });
+        return message;
+      }
+    },
+    [callVisual, patchScene, projects],
+  );
+
+
   const regenerateScript = useCallback(
     async (id: string): Promise<string | null> => {
       const project = projects.find((p) => p.id === id);
@@ -299,6 +350,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       },
       regenerateScript,
       regenerateScene,
+      generateVisual,
     }),
     [
       projects,
@@ -313,6 +365,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       updateProject,
       regenerateScript,
       regenerateScene,
+      generateVisual,
+
     ],
   );
 

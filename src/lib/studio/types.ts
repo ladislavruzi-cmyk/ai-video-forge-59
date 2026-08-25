@@ -30,6 +30,13 @@ export interface WorkflowStep {
   pending?: boolean;
 }
 
+export const VISUAL_STATUS_LABEL: Record<StepStatus, string> = {
+  waiting: "Čeká",
+  running: "Generuje se",
+  done: "Hotovo",
+  error: "Chyba",
+};
+
 export interface Scene {
   id: string;
   index: number;
@@ -40,7 +47,13 @@ export interface Scene {
   mood: string;
   transition: string;
   status: StepStatus;
+  /** Stav generování vizuálu scény. */
+  visualStatus?: StepStatus;
+  /** Cesta k obrázku v privátním úložišti. */
+  imagePath?: string | null;
+  visualError?: string | null;
 }
+
 
 export interface SoundTrack {
   id: string;
@@ -112,7 +125,7 @@ export const WORKFLOW_BLUEPRINT: { id: string; title: string; description: strin
   { id: "analyza", title: "Analýza tématu", description: "Rozbor tématu, cílové skupiny a klíčových bodů" },
   { id: "scenar", title: "Vytvoření scénáře", description: "AI generuje kompletní komentář" },
   { id: "sceny", title: "Rozdělení scén", description: "AI rozpad scénáře na strukturované scény" },
-  { id: "vizualy", title: "Vytvoření vizuálů", description: "Připraveno k napojení API", pending: true },
+  { id: "vizualy", title: "Vytvoření vizuálů", description: "Spusť v projektu → záložka Vizuály (AI obrázky scén)" },
   { id: "dabing", title: "Generování dabingu", description: "Připraveno k napojení API", pending: true },
   { id: "sync", title: "Synchronizace obrazu a zvuku", description: "Připraveno k napojení API", pending: true },
   { id: "hudba", title: "Přidání hudby a efektů", description: "Připraveno k napojení API", pending: true },

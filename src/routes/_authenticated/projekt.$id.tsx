@@ -3,6 +3,7 @@ import { useState } from "react";
 import {
   Captions,
   Download,
+  ImagePlus,
   Music4,
   Play,
   RefreshCw,
@@ -10,9 +11,17 @@ import {
   Youtube,
 } from "lucide-react";
 import { AppShell } from "@/components/studio/AppShell";
+import { SceneImage } from "@/components/studio/SceneImage";
 import { useStudio } from "@/lib/studio/store";
-import { STEP_STATUS_LABEL, countWords, formatDuration, type Scene } from "@/lib/studio/types";
+import {
+  STEP_STATUS_LABEL,
+  VISUAL_STATUS_LABEL,
+  countWords,
+  formatDuration,
+  type Scene,
+} from "@/lib/studio/types";
 import scenePreview from "@/assets/scene-preview.jpg";
+
 
 export const Route = createFileRoute("/_authenticated/projekt/$id")({
   head: () => ({
@@ -41,7 +50,7 @@ const TABS = [
 
 function ProjectPage() {
   const { id } = Route.useParams();
-  const { getProject, updateProject, regenerateScript, regenerateScene } = useStudio();
+  const { getProject, updateProject, regenerateScript, regenerateScene, generateVisual } = useStudio();
   const project = getProject(id);
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("scenar");
   const [note, setNote] = useState<string | null>(null);
@@ -74,18 +83,26 @@ function ProjectPage() {
       scenes: project.scenes.map((s) => (s.id === sceneId ? { ...s, ...patch } : s)),
     });
 
+  const coverPath = project.scenes.find((s) => s.imagePath)?.imagePath ?? null;
+
+
   return (
     <AppShell title="Projekt videa">
       <div className="space-y-8">
         <section className="overflow-hidden rounded-2xl border border-border bg-surface">
           <div className="relative aspect-video w-full bg-surface-2">
-            <img
-              src={scenePreview}
-              alt={`Náhled videa: ${project.title}`}
-              width={1280}
-              height={720}
-              className="size-full object-cover opacity-80"
-            />
+            {coverPath ? (
+              <SceneImage path={coverPath} alt={`Náhled videa: ${project.title}`} />
+            ) : (
+              <img
+                src={scenePreview}
+                alt={`Náhled videa: ${project.title}`}
+                width={1280}
+                height={720}
+                className="size-full object-cover opacity-80"
+              />
+            )}
+
             <div className="absolute inset-0 grid place-items-center">
               <span className="grid size-14 place-items-center rounded-full bg-brand/80 backdrop-blur">
                 <Play className="size-6 text-brand-foreground" />
@@ -336,36 +353,91 @@ function ProjectPage() {
 
         {tab === "vizualy" && (
           <section className="space-y-4">
-            <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Vizuály</h3>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Vizuály</h3>
+              <button
+                disabled={busy !== null}
+                onClick={async () => {
+                  setNote(null);
+                  setErr(null);
+                  let failed = 0;
+                  for (const scene of project.scenes) {
+                    setBusy(`vis-${scene.id}`);
+                    const message = await generateVisual(project.id, scene.id);
+                    if (message) failed += 1;
+                  }
+                  setBusy(null);
+                  if (failed > 0) setErr(`${failed} scén(y) se nepodařilo vygenerovat. Zkus je znovu jednotlivě.`);
+                  else setNote("Vizuály všech scén byly vygenerovány.");
+                }}
+                className="flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-brand-foreground disabled:opacity-60"
+              >
+                <ImagePlus className="size-4" />
+                Vygenerovat všechny vizuály
+              </button>
+            </div>
             <div className="grid gap-4 sm:grid-cols-2">
-              {project.scenes.map((scene) => (
-                <figure key={scene.id} className="overflow-hidden rounded-xl border border-border bg-surface">
-                  <img
-                    src={scenePreview}
-                    alt={`Náhled scény ${scene.index}: ${scene.title}`}
-                    loading="lazy"
-                    width={1280}
-                    height={720}
-                    className="aspect-video w-full object-cover opacity-70"
-                  />
-                  <figcaption className="space-y-2 p-3">
-                    <p className="text-xs font-semibold">
-                      Scéna {scene.index} — {scene.title}
-                    </p>
-                    <p className="line-clamp-2 text-[11px] text-muted-foreground">{scene.visualPrompt}</p>
-                    <button
-                      onClick={() => setNote(`Regenerace scény ${scene.index} se spustí po připojení AI obrázkového API.`)}
-                      className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-cyan"
-                    >
-                      <RefreshCw className="size-3" />
-                      Regenerovat scénu
-                    </button>
-                  </figcaption>
-                </figure>
-              ))}
+              {project.scenes.map((scene) => {
+                const status = scene.visualStatus ?? "waiting";
+                const generating = busy === `vis-${scene.id}` || status === "running";
+                return (
+                  <figure key={scene.id} className="overflow-hidden rounded-xl border border-border bg-surface">
+                    <SceneImage
+                      path={scene.imagePath}
+                      alt={`Náhled scény ${scene.index}: ${scene.title}`}
+                    />
+                    <figcaption className="space-y-2 p-3">
+                      <div className="flex items-center justify-between gap-2 text-[10px] font-bold uppercase tracking-wider">
+                        <span className="text-muted-foreground">Scéna {scene.index}</span>
+                        <span
+                          className={
+                            status === "done"
+                              ? "text-status-done"
+                              : status === "error"
+                                ? "text-status-error"
+                                : status === "running"
+                                  ? "text-cyan"
+                                  : "text-muted-foreground"
+                          }
+                        >
+                          {VISUAL_STATUS_LABEL[generating ? "running" : status]}
+                        </span>
+                      </div>
+                      <p className="text-xs font-semibold">{scene.title}</p>
+                      <p className="line-clamp-2 font-mono text-[11px] text-muted-foreground">
+                        {scene.visualPrompt}
+                      </p>
+                      {scene.visualError && (
+                        <p className="text-[11px] text-status-error">{scene.visualError}</p>
+                      )}
+                      <button
+                        disabled={busy !== null}
+                        onClick={async () => {
+                          setNote(null);
+                          setErr(null);
+                          setBusy(`vis-${scene.id}`);
+                          const message = await generateVisual(project.id, scene.id);
+                          setBusy(null);
+                          if (message) setErr(message);
+                          else setNote(`Vizuál scény ${scene.index} je hotový.`);
+                        }}
+                        className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-cyan disabled:opacity-60"
+                      >
+                        <RefreshCw className={`size-3 ${generating ? "animate-spin" : ""}`} />
+                        {generating
+                          ? "Generuji…"
+                          : scene.imagePath
+                            ? "Regenerovat vizuál"
+                            : "Vygenerovat vizuál"}
+                      </button>
+                    </figcaption>
+                  </figure>
+                );
+              })}
             </div>
           </section>
         )}
+
 
         {tab === "hudba" && (
           <section className="space-y-4">
