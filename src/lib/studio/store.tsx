@@ -317,7 +317,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       resetWorkflow,
       retryFailedStep,
       updateProject,
-      persist,
       regenerateScript,
       regenerateScene,
     ],
