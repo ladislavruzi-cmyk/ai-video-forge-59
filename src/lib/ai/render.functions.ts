@@ -32,6 +32,12 @@ export interface RenderJobView {
   storagePath: string | null;
   durationSeconds: number | null;
   sceneCount: number | null;
+  /** Skutečně ověřené parametry výsledného MP4 (ne požadované hodnoty). */
+  width: number | null;
+  height: number | null;
+  videoCodec: string | null;
+  audioCodec: string | null;
+  fileBytes: number | null;
   error: string | null;
   createdAt: string;
   finishedAt: string | null;
@@ -47,13 +53,18 @@ type JobRow = {
   storage_path: string | null;
   duration_seconds: number | string | null;
   scene_count: number | null;
+  width: number | null;
+  height: number | null;
+  video_codec: string | null;
+  audio_codec: string | null;
+  file_bytes: number | string | null;
   error: string | null;
   created_at: string;
   finished_at: string | null;
 };
 
 const JOB_COLUMNS =
-  "id, project_id, provider_render_id, status, stage, progress, output_url, storage_path, duration_seconds, scene_count, error, created_at, finished_at";
+  "id, project_id, provider_render_id, status, stage, progress, output_url, storage_path, duration_seconds, scene_count, width, height, video_codec, audio_codec, file_bytes, error, created_at, finished_at";
 
 function toView(row: JobRow, videoUrl: string | null): RenderJobView {
   const status = (["pending", "rendering", "done", "error"] as const).includes(
@@ -76,6 +87,11 @@ function toView(row: JobRow, videoUrl: string | null): RenderJobView {
     storagePath: row.storage_path,
     durationSeconds: row.duration_seconds === null ? null : Number(row.duration_seconds),
     sceneCount: row.scene_count,
+    width: row.width,
+    height: row.height,
+    videoCodec: row.video_codec,
+    audioCodec: row.audio_codec,
+    fileBytes: row.file_bytes === null ? null : Number(row.file_bytes),
     error: row.error,
     createdAt: row.created_at,
     finishedAt: row.finished_at,
@@ -362,6 +378,11 @@ export const renderStatusFn = createServerFn({ method: "POST" })
         output_url: provider.url,
         storage_path: path,
         duration_seconds: facts.seconds ?? expected,
+        width: facts.width,
+        height: facts.height,
+        video_codec: facts.videoCodec,
+        audio_codec: facts.audioCodec,
+        file_bytes: bytes.byteLength,
         error: null,
         finished_at: new Date().toISOString(),
       })
@@ -385,6 +406,39 @@ async function resolveVideoUrl(supabase: unknown, job: JobRow): Promise<string |
   return job.output_url ?? null;
 }
 
+/**
+ * Doplní skutečné parametry u starších hotových renderů (uložených ještě bez
+ * ověření). Soubor se čte z úložiště, nic se negeneruje znovu.
+ */
+async function backfillFacts(supabase: any, job: JobRow): Promise<JobRow> {
+  if (job.status !== "done" || job.width !== null || !job.storage_path) return job;
+  try {
+    const url = await signedUrl(supabase as Client, RENDERS_BUCKET, job.storage_path);
+    const res = await fetch(url);
+    if (!res.ok) return job;
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    if (bytes.byteLength === 0 || bytes.byteLength > MAX_COPY_BYTES) return job;
+    const { facts } = validateRenderedMp4(bytes, null);
+    if (!facts.container) return job;
+    const { data: updated } = await supabase
+      .from("render_jobs")
+      .update({
+        width: facts.width,
+        height: facts.height,
+        video_codec: facts.videoCodec,
+        audio_codec: facts.audioCodec,
+        file_bytes: bytes.byteLength,
+        duration_seconds: facts.seconds ?? job.duration_seconds,
+      })
+      .eq("id", job.id)
+      .select(JOB_COLUMNS)
+      .single();
+    return (updated ?? job) as unknown as JobRow;
+  } catch {
+    return job;
+  }
+}
+
 const latestSchema = z.object({ projectId: z.string().min(1) });
 
 /** Poslední render úloha projektu — zdroj pravdy pro stav exportu. */
@@ -400,8 +454,9 @@ export const latestRenderFn = createServerFn({ method: "POST" })
       .order("created_at", { ascending: false })
       .limit(1);
     if (error) throw new Error(`Stav exportu se nepodařilo načíst: ${error.message}`);
-    const row = (rows ?? [])[0] as unknown as JobRow | undefined;
-    if (!row) return { job: null as RenderJobView | null };
+    const first = (rows ?? [])[0] as unknown as JobRow | undefined;
+    if (!first) return { job: null as RenderJobView | null };
+    const row = await backfillFacts(supabase, first);
     return { job: toView(row, await resolveVideoUrl(supabase, row)) };
   });
 
@@ -423,6 +478,6 @@ export const refreshRenderUrlFn = createServerFn({ method: "POST" })
       .maybeSingle();
     if (error) throw new Error(`Odkaz na video se nepodařilo obnovit: ${error.message}`);
     if (!row) throw new Error("Render úloha nebyla nalezena.");
-    const job = row as unknown as JobRow;
+    const job = await backfillFacts(supabase, row as unknown as JobRow);
     return { job: toView(job, await resolveVideoUrl(supabase, job)) };
   });
