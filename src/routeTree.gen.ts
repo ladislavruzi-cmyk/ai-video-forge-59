@@ -19,6 +19,7 @@ import { Route as AuthenticatedNastaveniRouteImport } from './routes/_authentica
 import { Route as AuthenticatedProjektyRouteImport } from './routes/_authenticated/projekty'
 import { Route as AuthenticatedSablonyRouteImport } from './routes/_authenticated/sablony'
 import { Route as AuthenticatedProjektIdRouteImport } from './routes/_authenticated/projekt.$id'
+import { Route as ApiPublicVisualWorkerRouteImport } from './routes/api/public/visual-worker'
 
 const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
   id: '/_authenticated',
@@ -69,6 +70,11 @@ const AuthenticatedProjektIdRoute = AuthenticatedProjektIdRouteImport.update({
   path: '/projekt/$id',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const ApiPublicVisualWorkerRoute = ApiPublicVisualWorkerRouteImport.update({
+  id: '/api/public/visual-worker',
+  path: '/api/public/visual-worker',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
@@ -80,6 +86,7 @@ export interface FileRoutesByFullPath {
   '/projekty': typeof AuthenticatedProjektyRoute
   '/sablony': typeof AuthenticatedSablonyRoute
   '/projekt/$id': typeof AuthenticatedProjektIdRoute
+  '/api/public/visual-worker': typeof ApiPublicVisualWorkerRoute
 }
 export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
@@ -91,6 +98,7 @@ export interface FileRoutesByTo {
   '/sablony': typeof AuthenticatedSablonyRoute
   '/': typeof AuthenticatedIndexRoute
   '/projekt/$id': typeof AuthenticatedProjektIdRoute
+  '/api/public/visual-worker': typeof ApiPublicVisualWorkerRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -104,6 +112,7 @@ export interface FileRoutesById {
   '/_authenticated/sablony': typeof AuthenticatedSablonyRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/projekt/$id': typeof AuthenticatedProjektIdRoute
+  '/api/public/visual-worker': typeof ApiPublicVisualWorkerRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -117,6 +126,7 @@ export interface FileRouteTypes {
     | '/projekty'
     | '/sablony'
     | '/projekt/$id'
+    | '/api/public/visual-worker'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/auth'
@@ -128,6 +138,7 @@ export interface FileRouteTypes {
     | '/sablony'
     | '/'
     | '/projekt/$id'
+    | '/api/public/visual-worker'
   id:
     | '__root__'
     | '/_authenticated'
@@ -140,11 +151,13 @@ export interface FileRouteTypes {
     | '/_authenticated/sablony'
     | '/_authenticated/'
     | '/_authenticated/projekt/$id'
+    | '/api/public/visual-worker'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
+  ApiPublicVisualWorkerRoute: typeof ApiPublicVisualWorkerRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -219,6 +232,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedProjektIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/public/visual-worker': {
+      id: '/api/public/visual-worker'
+      path: '/api/public/visual-worker'
+      fullPath: '/api/public/visual-worker'
+      preLoaderRoute: typeof ApiPublicVisualWorkerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -250,6 +270,7 @@ const AuthenticatedRouteRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
+  ApiPublicVisualWorkerRoute: ApiPublicVisualWorkerRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
