@@ -520,6 +520,12 @@ function ProjectPage() {
                           style={{ width: `${percent}%` }}
                         />
                       </div>
+                      {batchRunning && (
+                        <p className="mt-2 text-[11px] text-muted-foreground">
+                          Fronta běží na serveru — můžeš stránku zavřít, generování pokračuje dál
+                          a při dalším otevření na něj navážeme.
+                        </p>
+                      )}
                       {!batchRunning && batch.failed > 0 && (
                         <p className="mt-2 text-[11px] text-status-error">
                           Některé scény skončily chybou. Použij „Znovu vygenerovat pouze chybné“.
