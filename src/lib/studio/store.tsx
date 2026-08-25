@@ -33,7 +33,12 @@ import {
   processVisualQueueFn,
 } from "@/lib/ai/queue.functions";
 import { supabase } from "@/integrations/supabase/client";
-import { fetchProjects, removeProject, saveProject } from "./projects.repo";
+import {
+  fetchActiveVisualJobs,
+  fetchProjects,
+  removeProject,
+  saveProject,
+} from "./projects.repo";
 
 
 function errorMessage(err: unknown): string {
@@ -94,6 +99,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const projectsRef = useRef<VideoProject[]>(projects);
   projectsRef.current = projects;
   const [visualBatch, setVisualBatch] = useState<VisualBatchState | null>(null);
+  const [resumeProjectId, setResumeProjectId] = useState<string | null>(null);
   const batchRef = useRef(false);
   const cancelRef = useRef(false);
 
@@ -109,7 +115,12 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     void fetchProjects()
-      .then(setProjects)
+      .then(async (list) => {
+        setProjects(list);
+        // Nedoběhnutá serverová fronta se po otevření aplikace sama rozjede dál.
+        const jobs = await fetchActiveVisualJobs().catch(() => []);
+        setResumeProjectId(jobs[0]?.projectId ?? null);
+      })
       .catch(() => {
         /* nepřihlášený nebo offline — gate routy uživatele přesměruje */
       });
@@ -407,6 +418,12 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     },
     [callEnqueue, callProcessQueue, patchScene],
   );
+
+  useEffect(() => {
+    if (!resumeProjectId) return;
+    setResumeProjectId(null);
+    void generateVisualsBatch(resumeProjectId, "missing");
+  }, [generateVisualsBatch, resumeProjectId]);
 
   const cancelVisualBatch = useCallback(() => {
     cancelRef.current = true;
