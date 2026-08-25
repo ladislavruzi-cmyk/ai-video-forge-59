@@ -82,6 +82,8 @@ interface StudioContextValue {
   visualBatch: VisualBatchState | null;
   generateVisualsBatch: (id: string, mode: VisualBatchMode) => Promise<void>;
   cancelVisualBatch: () => void;
+  /** Synchronizace obrazu a zvuku — vrací počet úspěšných a chybných scén. */
+  syncScenes: (id: string, sceneIds?: string[]) => Promise<{ synced: number; failed: number }>;
 }
 
 
