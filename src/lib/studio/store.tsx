@@ -488,6 +488,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       regenerateScene,
       generateVisual,
       generateVoice,
+      visualBatch,
+      generateVisualsBatch,
+      cancelVisualBatch,
     }),
     [
       projects,
@@ -504,6 +507,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       regenerateScene,
       generateVisual,
       generateVoice,
+      visualBatch,
+      generateVisualsBatch,
+      cancelVisualBatch,
     ],
   );
 
