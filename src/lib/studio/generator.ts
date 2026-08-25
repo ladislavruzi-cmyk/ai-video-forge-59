@@ -45,7 +45,10 @@ export function normalizeScenes(raw: RawScene[], targetSeconds: number): Scene[]
     mood: s.mood?.trim() || "Neutral",
     transition: s.transition?.trim() || "Cut",
     status: "done" as const,
-  }));
+    visualStatus: "waiting" as const,
+    imagePath: null,
+    visualError: null,
+
 }
 
 export function toRawScene(scene: Scene): RawScene {
