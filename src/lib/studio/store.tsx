@@ -27,6 +27,12 @@ import {
 import { generateScenesFn, generateScriptFn, regenerateSceneFn } from "@/lib/ai/pipeline.functions";
 import { generateSceneVisualFn } from "@/lib/ai/visuals.functions";
 import { generateSceneVoiceFn } from "@/lib/ai/voice.functions";
+import {
+  cancelVisualJobsFn,
+  enqueueVisualJobsFn,
+  processVisualQueueFn,
+} from "@/lib/ai/queue.functions";
+import { supabase } from "@/integrations/supabase/client";
 import { fetchProjects, removeProject, saveProject } from "./projects.repo";
 
 
@@ -96,6 +102,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const callScene = useServerFn(regenerateSceneFn);
   const callVisual = useServerFn(generateSceneVisualFn);
   const callVoice = useServerFn(generateSceneVoiceFn);
+  const callEnqueue = useServerFn(enqueueVisualJobsFn);
+  const callProcessQueue = useServerFn(processVisualQueueFn);
+  const callCancelJobs = useServerFn(cancelVisualJobsFn);
 
 
   useEffect(() => {
