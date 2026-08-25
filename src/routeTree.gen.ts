@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedHlasyRouteImport } from './routes/_authenticated/hlasy'
@@ -18,55 +19,59 @@ import { Route as AuthenticatedProjektyRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedSablonyRouteImport } from './routes/_authenticated/sablony'
 import { Route as AuthenticatedProjektIdRouteImport } from './routes/_authenticated/projekt.$id'
 
-const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
-  id: '/_authenticated/',
-  path: '/',
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
-  id: '/_authenticated/dashboard',
+  id: '/dashboard',
   path: '/dashboard',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedHlasyRoute = AuthenticatedHlasyRouteImport.update({
-  id: '/_authenticated/hlasy',
+  id: '/hlasy',
   path: '/hlasy',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedHudbaRoute = AuthenticatedHudbaRouteImport.update({
-  id: '/_authenticated/hudba',
+  id: '/hudba',
   path: '/hudba',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedNastaveniRoute = AuthenticatedNastaveniRouteImport.update({
-  id: '/_authenticated/nastaveni',
+  id: '/nastaveni',
   path: '/nastaveni',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedProjektyRoute = AuthenticatedProjektyRouteImport.update({
-  id: '/_authenticated/projekty',
+  id: '/projekty',
   path: '/projekty',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedSablonyRoute = AuthenticatedSablonyRouteImport.update({
-  id: '/_authenticated/sablony',
+  id: '/sablony',
   path: '/sablony',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedProjektIdRoute = AuthenticatedProjektIdRouteImport.update({
-  id: '/_authenticated/projekt/$id',
+  id: '/projekt/$id',
   path: '/projekt/$id',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
+  '/': typeof AuthenticatedIndexRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/hlasy': typeof AuthenticatedHlasyRoute
   '/hudba': typeof AuthenticatedHudbaRoute
   '/nastaveni': typeof AuthenticatedNastaveniRoute
   '/projekty': typeof AuthenticatedProjektyRoute
   '/sablony': typeof AuthenticatedSablonyRoute
-  '/': typeof AuthenticatedIndexRoute
   '/projekt/$id': typeof AuthenticatedProjektIdRoute
 }
 export interface FileRoutesByTo {
@@ -81,6 +86,7 @@ export interface FileRoutesByTo {
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
+  '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/hlasy': typeof AuthenticatedHlasyRoute
   '/_authenticated/hudba': typeof AuthenticatedHudbaRoute
@@ -93,13 +99,13 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
+    | '/'
     | '/dashboard'
     | '/hlasy'
     | '/hudba'
     | '/nastaveni'
     | '/projekty'
     | '/sablony'
-    | '/'
     | '/projekt/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -113,6 +119,7 @@ export interface FileRouteTypes {
     | '/projekt/$id'
   id:
     | '__root__'
+    | '/_authenticated'
     | '/_authenticated/dashboard'
     | '/_authenticated/hlasy'
     | '/_authenticated/hudba'
@@ -124,6 +131,78 @@ export interface FileRouteTypes {
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
+  AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
+}
+
+declare module '@tanstack/react-router' {
+  interface FileRoutesByPath {
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/': {
+      id: '/_authenticated/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/dashboard': {
+      id: '/_authenticated/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof AuthenticatedDashboardRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/hlasy': {
+      id: '/_authenticated/hlasy'
+      path: '/hlasy'
+      fullPath: '/hlasy'
+      preLoaderRoute: typeof AuthenticatedHlasyRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/hudba': {
+      id: '/_authenticated/hudba'
+      path: '/hudba'
+      fullPath: '/hudba'
+      preLoaderRoute: typeof AuthenticatedHudbaRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/nastaveni': {
+      id: '/_authenticated/nastaveni'
+      path: '/nastaveni'
+      fullPath: '/nastaveni'
+      preLoaderRoute: typeof AuthenticatedNastaveniRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/projekty': {
+      id: '/_authenticated/projekty'
+      path: '/projekty'
+      fullPath: '/projekty'
+      preLoaderRoute: typeof AuthenticatedProjektyRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/sablony': {
+      id: '/_authenticated/sablony'
+      path: '/sablony'
+      fullPath: '/sablony'
+      preLoaderRoute: typeof AuthenticatedSablonyRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/projekt/$id': {
+      id: '/_authenticated/projekt/$id'
+      path: '/projekt/$id'
+      fullPath: '/projekt/$id'
+      preLoaderRoute: typeof AuthenticatedProjektIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+  }
+}
+
+interface AuthenticatedRouteRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedHlasyRoute: typeof AuthenticatedHlasyRoute
   AuthenticatedHudbaRoute: typeof AuthenticatedHudbaRoute
@@ -134,68 +213,7 @@ export interface RootRouteChildren {
   AuthenticatedProjektIdRoute: typeof AuthenticatedProjektIdRoute
 }
 
-declare module '@tanstack/react-router' {
-  interface FileRoutesByPath {
-    '/_authenticated/': {
-      id: '/_authenticated/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof AuthenticatedIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_authenticated/dashboard': {
-      id: '/_authenticated/dashboard'
-      path: '/dashboard'
-      fullPath: '/dashboard'
-      preLoaderRoute: typeof AuthenticatedDashboardRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_authenticated/hlasy': {
-      id: '/_authenticated/hlasy'
-      path: '/hlasy'
-      fullPath: '/hlasy'
-      preLoaderRoute: typeof AuthenticatedHlasyRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_authenticated/hudba': {
-      id: '/_authenticated/hudba'
-      path: '/hudba'
-      fullPath: '/hudba'
-      preLoaderRoute: typeof AuthenticatedHudbaRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_authenticated/nastaveni': {
-      id: '/_authenticated/nastaveni'
-      path: '/nastaveni'
-      fullPath: '/nastaveni'
-      preLoaderRoute: typeof AuthenticatedNastaveniRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_authenticated/projekty': {
-      id: '/_authenticated/projekty'
-      path: '/projekty'
-      fullPath: '/projekty'
-      preLoaderRoute: typeof AuthenticatedProjektyRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_authenticated/sablony': {
-      id: '/_authenticated/sablony'
-      path: '/sablony'
-      fullPath: '/sablony'
-      preLoaderRoute: typeof AuthenticatedSablonyRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_authenticated/projekt/$id': {
-      id: '/_authenticated/projekt/$id'
-      path: '/projekt/$id'
-      fullPath: '/projekt/$id'
-      preLoaderRoute: typeof AuthenticatedProjektIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-  }
-}
-
-const rootRouteChildren: RootRouteChildren = {
+const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedHlasyRoute: AuthenticatedHlasyRoute,
   AuthenticatedHudbaRoute: AuthenticatedHudbaRoute,
@@ -204,6 +222,13 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedSablonyRoute: AuthenticatedSablonyRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedProjektIdRoute: AuthenticatedProjektIdRoute,
+}
+
+const AuthenticatedRouteRouteWithChildren =
+  AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
+
+const rootRouteChildren: RootRouteChildren = {
+  AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
