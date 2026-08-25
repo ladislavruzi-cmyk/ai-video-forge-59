@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
+import { validateRenderedMp4 } from "./mp4.server";
 import {
   buildRenderSource,
   createRender,
@@ -26,6 +27,8 @@ export interface RenderJobView {
   progress: number | null;
   /** Odkaz na hotové MP4 — z vlastního úložiště, jinak z CDN render služby. */
   videoUrl: string | null;
+  /** Stejný soubor s vynuceným stažením (Content-Disposition: attachment). */
+  downloadUrl: string | null;
   storagePath: string | null;
   durationSeconds: number | null;
   sceneCount: number | null;
@@ -65,6 +68,11 @@ function toView(row: JobRow, videoUrl: string | null): RenderJobView {
     stage: row.stage,
     progress: row.progress,
     videoUrl,
+    downloadUrl: videoUrl
+      ? videoUrl.includes("/storage/v1/object/sign/")
+        ? `${videoUrl}&download=video.mp4`
+        : videoUrl
+      : null,
     storagePath: row.storage_path,
     durationSeconds: row.duration_seconds === null ? null : Number(row.duration_seconds),
     sceneCount: row.scene_count,
@@ -279,37 +287,70 @@ export const renderStatusFn = createServerFn({ method: "POST" })
       return { job: toView((updated ?? job) as unknown as JobRow, null) };
     }
 
-    // Hotové MP4 ověříme a pokud to velikost dovolí, uložíme k projektu.
-    const head = await fetch(provider.url, { method: "GET", headers: { Range: "bytes=0-1" } });
-    if (!head.ok && head.status !== 206) {
-      const message = `Hotové MP4 není dostupné ke stažení (HTTP ${head.status}).`;
+    // Hotové MP4 nejdřív skutečně stáhneme a ověříme — bez toho žádné „Video připraveno“.
+    const failWith = async (message: string) => {
       const { data: updated } = await supabase
         .from("render_jobs")
-        .update({ status: "error", stage: "Render selhal", error: message })
+        .update({
+          status: "error",
+          stage: "Render selhal",
+          error: message,
+          finished_at: new Date().toISOString(),
+        })
         .eq("id", job.id)
         .select(JOB_COLUMNS)
         .single();
-      return { job: toView((updated ?? job) as unknown as JobRow, null) };
-    }
-    const totalHeader = head.headers.get("content-range")?.split("/")[1];
-    const size = totalHeader ? Number(totalHeader) : Number(head.headers.get("content-length") ?? 0);
-    await head.arrayBuffer().catch(() => undefined);
+      return { job: toView((updated ?? { ...job, status: "error", error: message }) as unknown as JobRow, null) };
+    };
 
-    let storagePath: string | null = null;
-    if (size > 0 && size <= MAX_COPY_BYTES) {
-      try {
-        const file = await fetch(provider.url);
-        if (file.ok) {
-          const bytes = new Uint8Array(await file.arrayBuffer());
-          const path = `${userId}/${job.project_id}/${job.id}.mp4`;
-          const { error: upErr } = await supabase.storage
-            .from(RENDERS_BUCKET)
-            .upload(path, bytes, { contentType: "video/mp4", upsert: true });
-          if (!upErr) storagePath = path;
-        }
-      } catch {
-        // Uložení do vlastního úložiště je bonus — video zůstává na CDN služby.
+    let bytes: Uint8Array;
+    try {
+      const file = await fetch(provider.url);
+      if (!file.ok) {
+        return await failWith(`Hotové MP4 není dostupné ke stažení (HTTP ${file.status}).`);
       }
+      bytes = new Uint8Array(await file.arrayBuffer());
+    } catch (err) {
+      return await failWith(
+        `Hotové MP4 se nepodařilo stáhnout z render služby: ${err instanceof Error ? err.message : "neznámá chyba"}`,
+      );
+    }
+
+    if (bytes.byteLength > MAX_COPY_BYTES) {
+      return await failWith(
+        `Vyrenderované video je příliš velké (${Math.round(bytes.byteLength / 1024 / 1024)} MB) na uložení do úložiště.`,
+      );
+    }
+
+    const expected = job.duration_seconds === null ? null : Number(job.duration_seconds);
+    const { error: invalid, facts } = validateRenderedMp4(bytes, expected);
+    if (invalid) {
+      return await failWith(`Export neprošel kontrolou: ${invalid}`);
+    }
+
+    const path = `${userId}/${job.project_id}/${job.id}.mp4`;
+    const { error: upErr } = await supabase.storage
+      .from(RENDERS_BUCKET)
+      .upload(path, bytes, { contentType: "video/mp4", upsert: true, cacheControl: "3600" });
+    if (upErr) {
+      return await failWith(`Hotové MP4 se nepodařilo uložit do úložiště: ${upErr.message}`);
+    }
+
+    // Kontrola, že uložený soubor je skutečně stažitelný a celý.
+    try {
+      const check = await signedUrl(supabase as unknown as Client, RENDERS_BUCKET, path);
+      const res = await fetch(check, { headers: { Range: "bytes=0-1" } });
+      const total = Number(res.headers.get("content-range")?.split("/")[1] ?? 0);
+      await res.arrayBuffer().catch(() => undefined);
+      if (total !== bytes.byteLength) {
+        return await failWith(
+          `Uložené MP4 v úložišti má jinou velikost (${total} B) než vyrenderovaný soubor (${bytes.byteLength} B).`,
+        );
+      }
+    } catch (err) {
+      return await failWith(
+        `Uložené MP4 nelze z úložiště přehrát: ${err instanceof Error ? err.message : "neznámá chyba"}`,
+      );
     }
 
     const { data: updated } = await supabase
@@ -319,7 +360,8 @@ export const renderStatusFn = createServerFn({ method: "POST" })
         stage: "Video připraveno",
         progress: 100,
         output_url: provider.url,
-        storage_path: storagePath,
+        storage_path: path,
+        duration_seconds: facts.seconds ?? expected,
         error: null,
         finished_at: new Date().toISOString(),
       })
@@ -327,9 +369,10 @@ export const renderStatusFn = createServerFn({ method: "POST" })
       .select(JOB_COLUMNS)
       .single();
 
-    const finished = (updated ?? { ...job, status: "done", output_url: provider.url, storage_path: storagePath }) as unknown as JobRow;
+    const finished = (updated ?? { ...job, status: "done", output_url: provider.url, storage_path: path }) as unknown as JobRow;
     return { job: toView(finished, await resolveVideoUrl(supabase, finished)) };
   });
+
 
 async function resolveVideoUrl(supabase: unknown, job: JobRow): Promise<string | null> {
   if (job.storage_path) {
@@ -360,4 +403,26 @@ export const latestRenderFn = createServerFn({ method: "POST" })
     const row = (rows ?? [])[0] as unknown as JobRow | undefined;
     if (!row) return { job: null as RenderJobView | null };
     return { job: toView(row, await resolveVideoUrl(supabase, row)) };
+  });
+
+const refreshSchema = z.object({ jobId: z.string().min(1) });
+
+/**
+ * Obnoví podepsaný odkaz na hotové MP4. Podepsané odkazy mají omezenou
+ * platnost — po expiraci by přehrávač zůstal na černé obrazovce.
+ */
+export const refreshRenderUrlFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => refreshSchema.parse(input))
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const { data: row, error } = await supabase
+      .from("render_jobs")
+      .select(JOB_COLUMNS)
+      .eq("id", data.jobId)
+      .maybeSingle();
+    if (error) throw new Error(`Odkaz na video se nepodařilo obnovit: ${error.message}`);
+    if (!row) throw new Error("Render úloha nebyla nalezena.");
+    const job = row as unknown as JobRow;
+    return { job: toView(job, await resolveVideoUrl(supabase, job)) };
   });

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { AlertTriangle, Check, Download, Loader2, Play, RefreshCw, Upload } from "lucide-react";
-import { latestRenderFn, renderStatusFn, startRenderFn, type RenderJobView } from "@/lib/ai/render.functions";
+import { latestRenderFn, refreshRenderUrlFn, renderStatusFn, startRenderFn, type RenderJobView } from "@/lib/ai/render.functions";
 import { formatSeconds } from "@/lib/studio/timeline";
 import type { VideoProject } from "@/lib/studio/types";
 
@@ -43,6 +43,7 @@ export function RenderPanel({
   const callStart = useServerFn(startRenderFn);
   const callStatus = useServerFn(renderStatusFn);
   const callLatest = useServerFn(latestRenderFn);
+  const callRefresh = useServerFn(refreshRenderUrlFn);
 
   const [job, setJob] = useState<RenderJobView | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -73,6 +74,26 @@ export function RenderPanel({
     },
     [callStatus, onStateChange],
   );
+
+  /** Obnoví podepsaný odkaz — po expiraci by přehrávač zůstal černý. */
+  const refreshUrl = useCallback(
+    async (jobId: string) => {
+      try {
+        const { job: fresh } = (await callRefresh({ data: { jobId } })) as { job: RenderJobView };
+        setJob(fresh);
+      } catch {
+        setError("Odkaz na video vypršel a nepodařilo se ho obnovit. Zkus stránku načíst znovu.");
+      }
+    },
+    [callRefresh],
+  );
+
+  useEffect(() => {
+    if (job?.status !== "done") return;
+    const id = job.id;
+    const interval = setInterval(() => void refreshUrl(id), 30 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [job?.status, job?.id, refreshUrl]);
 
   useEffect(() => {
     let alive = true;
@@ -175,12 +196,26 @@ export function RenderPanel({
 
         {ready && job.videoUrl && (
           <video
+            key={job.videoUrl}
             src={job.videoUrl}
             controls
+            playsInline
             preload="metadata"
+            onError={() => void refreshUrl(job.id)}
             className="w-full rounded-xl border border-border bg-black"
           />
         )}
+
+        {ready && (
+          <button
+            onClick={() => void refreshUrl(job.id)}
+            className="flex items-center justify-center gap-2 rounded-xl border border-border bg-surface-2 py-2 text-xs font-medium"
+          >
+            <RefreshCw className="size-3.5" />
+            Obnovit odkaz na video
+          </button>
+        )}
+
       </div>
 
       <button
@@ -204,13 +239,14 @@ export function RenderPanel({
             Přehrát video
           </a>
           <a
-            href={job.videoUrl}
+            href={job.downloadUrl ?? job.videoUrl}
             download={`${project.title || "video"}.mp4`}
             className="flex items-center justify-center gap-2 rounded-xl border border-border bg-surface py-3.5 text-sm font-medium"
           >
             <Download className="size-4" />
             Stáhnout video
           </a>
+
         </div>
       )}
     </section>
