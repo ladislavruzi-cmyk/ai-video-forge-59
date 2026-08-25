@@ -30,6 +30,13 @@ export interface WorkflowStep {
   pending?: boolean;
 }
 
+export const VISUAL_STATUS_LABEL: Record<StepStatus, string> = {
+  waiting: "Čeká",
+  running: "Generuje se",
+  done: "Hotovo",
+  error: "Chyba",
+};
+
 export interface Scene {
   id: string;
   index: number;
@@ -40,7 +47,13 @@ export interface Scene {
   mood: string;
   transition: string;
   status: StepStatus;
+  /** Stav generování vizuálu scény. */
+  visualStatus?: StepStatus;
+  /** Cesta k obrázku v privátním úložišti. */
+  imagePath?: string | null;
+  visualError?: string | null;
 }
+
 
 export interface SoundTrack {
   id: string;
