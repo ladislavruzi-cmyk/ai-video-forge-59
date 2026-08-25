@@ -52,6 +52,13 @@ export function normalizeScenes(raw: RawScene[], targetSeconds: number): Scene[]
     audioPath: null,
     audioSeconds: null,
     audioError: null,
+    syncStatus: "waiting" as const,
+    syncError: null,
+    audioDuration: null,
+    visualDuration: null,
+    startTime: null,
+    endTime: null,
+    transitionSeconds: null,
   }));
 }
 
