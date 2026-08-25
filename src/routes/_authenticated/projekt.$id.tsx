@@ -88,13 +88,18 @@ function ProjectPage() {
       <div className="space-y-8">
         <section className="overflow-hidden rounded-2xl border border-border bg-surface">
           <div className="relative aspect-video w-full bg-surface-2">
-            <img
-              src={scenePreview}
-              alt={`Náhled videa: ${project.title}`}
-              width={1280}
-              height={720}
-              className="size-full object-cover opacity-80"
-            />
+            {coverPath ? (
+              <SceneImage path={coverPath} alt={`Náhled videa: ${project.title}`} />
+            ) : (
+              <img
+                src={scenePreview}
+                alt={`Náhled videa: ${project.title}`}
+                width={1280}
+                height={720}
+                className="size-full object-cover opacity-80"
+              />
+            )}
+
             <div className="absolute inset-0 grid place-items-center">
               <span className="grid size-14 place-items-center rounded-full bg-brand/80 backdrop-blur">
                 <Play className="size-6 text-brand-foreground" />
