@@ -435,6 +435,100 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     if (id) void callCancelJobs({ data: { projectId: id } }).catch(() => undefined);
   }, [callCancelJobs, visualBatch]);
 
+  /**
+   * Synchronizace obrazu a zvuku. Server přečte skutečné uložené soubory scén
+   * (obrázek + WAV) a vrátí reálné délky; z nich sestavíme časovou osu.
+   * Nic se negeneruje ani nemaže. Chyba jedné scény nezastaví ostatní.
+   */
+  const syncScenes = useCallback(
+    async (id: string, sceneIds?: string[]): Promise<{ synced: number; failed: number }> => {
+      const project = projectsRef.current.find((p) => p.id === id);
+      if (!project) return { synced: 0, failed: 0 };
+
+      const targets = sceneIds
+        ? project.scenes.filter((s) => sceneIds.includes(s.id))
+        : project.scenes;
+      if (targets.length === 0) return { synced: 0, failed: 0 };
+
+      let results: SceneMediaResult[] = [];
+      try {
+        const res = (await callInspect({
+          data: {
+            projectId: id,
+            scenes: targets.map((s) => ({
+              sceneId: s.id,
+              audioPath: s.audioPath ?? null,
+              imagePath: s.imagePath ?? null,
+            })),
+          },
+        })) as { results: SceneMediaResult[] };
+        results = res.results;
+      } catch (err) {
+        const message = errorMessage(err);
+        setProjects((cur) =>
+          cur.map((p) =>
+            p.id === id
+              ? {
+                  ...p,
+                  scenes: p.scenes.map((s) =>
+                    targets.some((t) => t.id === s.id)
+                      ? { ...s, syncStatus: "error" as const, syncError: message }
+                      : s,
+                  ),
+                }
+              : p,
+          ),
+        );
+        return { synced: 0, failed: targets.length };
+      }
+
+      const byScene = new Map(results.map((r) => [r.sceneId, r]));
+
+      // Skutečné délky: nově zjištěné + dříve úspěšně zjištěné u ostatních scén.
+      const facts = new Map<string, number>();
+      for (const scene of project.scenes) {
+        const fresh = byScene.get(scene.id);
+        if (fresh) {
+          if (fresh.ok && fresh.audioSeconds) facts.set(scene.id, fresh.audioSeconds);
+        } else if (scene.audioDuration) {
+          facts.set(scene.id, scene.audioDuration);
+        }
+      }
+
+      const withTimeline = buildTimeline(project.scenes, facts).map((scene) => {
+        const fresh = byScene.get(scene.id);
+        if (fresh && !fresh.ok) {
+          return { ...scene, syncStatus: "error" as const, syncError: fresh.error };
+        }
+        return scene;
+      });
+
+      const synced = withTimeline.filter((s) => s.syncStatus === "done").length;
+      const failed = results.filter((r) => !r.ok).length;
+      const totalSeconds = Math.round(
+        withTimeline.reduce((max, s) => Math.max(max, s.endTime ?? 0), 0),
+      );
+
+      const next: VideoProject = {
+        ...project,
+        scenes: withTimeline,
+        totalSeconds: totalSeconds > 0 ? totalSeconds : project.totalSeconds,
+        timeline: {
+          syncedAt: new Date().toISOString(),
+          totalSeconds,
+          sceneCount: project.scenes.length,
+          syncedScenes: synced,
+          failedScenes: withTimeline.filter((s) => s.syncStatus === "error").length,
+        },
+      };
+
+      setProjects((cur) => cur.map((p) => (p.id === id ? next : p)));
+      await saveProject(next).catch(() => undefined);
+      return { synced, failed };
+    },
+    [callInspect],
+  );
+
 
 
   /** Vygeneruje dabing jedné scény. Chyba jedné scény neovlivní ostatní. */
